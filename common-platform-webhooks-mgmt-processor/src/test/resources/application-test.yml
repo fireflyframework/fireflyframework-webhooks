@@ -1,0 +1,72 @@
+# Test configuration for webhook processor integration tests
+firefly:
+  webhooks:
+    destination:
+      prefix: ""
+      suffix: ""
+      use-provider-as-topic: true
+      custom: ""
+
+  # Cache Configuration for Idempotency
+  cache:
+    enabled: true
+    default-cache-type: REDIS
+    redis:
+      cache-name: "webhook-idempotency"
+      enabled: true
+      # These will be overridden by test containers via @DynamicPropertySource
+      host: localhost
+      port: 6379
+      database: 0
+      key-prefix: "firefly:webhooks:processor:test"
+      default-ttl: 7d
+      connection-timeout: 10s
+      command-timeout: 5s
+
+  # EDA Configuration
+  eda:
+    enabled: true
+    default-publisher-type: KAFKA
+    metrics-enabled: true
+    health-enabled: true
+
+    # Publisher configuration
+    publishers:
+      kafka:
+        default:
+          enabled: true
+          # Bootstrap servers will be overridden by test containers
+          bootstrap-servers: localhost:9092
+          default-topic: events
+          properties:
+            acks: all
+            retries: 1
+
+    # Consumer configuration
+    # Topics are automatically discovered from @EventListener annotations
+    # No need to configure topics manually - they are determined dynamically
+    consumer:
+      enabled: true
+      group-id: webhook-processor-test
+      kafka:
+        default:
+          enabled: true
+          # Bootstrap servers will be overridden by test containers
+          bootstrap-servers: localhost:9092
+          auto-offset-reset: earliest
+          properties:
+            enable.auto.commit: true
+            auto.commit.interval.ms: 1000
+            metadata.max.age.ms: 1000
+
+logging:
+  level:
+    root: INFO
+    com.firefly.common.webhooks: DEBUG
+    com.firefly.common.cache: DEBUG
+    com.firefly.common.eda: DEBUG
+    org.apache.kafka: WARN
+    org.testcontainers: INFO
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
