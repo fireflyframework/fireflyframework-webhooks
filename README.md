@@ -49,8 +49,15 @@ This platform follows a **producer-consumer pattern** where:
 - **Universal Endpoint**: Single endpoint pattern `/api/v1/webhook/{providerName}`
 - **AS-IS Preservation**: Stores complete webhook payload, headers, and metadata
 - **Reactive Processing**: Built on Spring WebFlux for high concurrency
-- **Idempotency Support**: HTTP-level idempotency using `X-Idempotency-Key` header
-- **Enhanced Response**: Rich acknowledgment response with payload echo, timestamps, and processing metadata for webhook sender verification
+- **HTTP-level Idempotency**: Using `X-Idempotency-Key` header with Redis caching (24h TTL)
+- **Enhanced Response**: Rich acknowledgment response with payload echo, timestamps, and processing metadata
+
+### Security & Validation
+- **Rate Limiting**: Per-provider and per-IP rate limiting using Resilience4j (100 req/s default)
+- **Payload Size Validation**: Configurable max payload size (1MB default) to prevent DoS attacks
+- **Provider Name Validation**: Regex-based validation of provider names (alphanumeric and hyphens)
+- **IP Whitelisting**: Optional IP whitelist per provider with CIDR notation support (e.g., `192.168.1.0/24`)
+- **Content-Type Validation**: Ensures proper content type headers are present
 
 ### Message Queue Integration
 - **Multi-Protocol Support**: Kafka (primary) and RabbitMQ via `lib-common-eda`
@@ -58,19 +65,49 @@ This platform follows a **producer-consumer pattern** where:
 - **JSON Serialization**: Events published as JSON for easy consumption
 - **Guaranteed Delivery**: At-least-once delivery semantics
 
+### Resilience Patterns
+- **Circuit Breaker**: Prevents cascading failures when Kafka is down (no fallback, relies on lib-common-eda)
+- **Timeout Protection**: Configurable timeouts for Kafka publishing operations (10s default)
+- **Retry Logic**: Configurable exponential backoff with jitter per provider (3 retries default, 1s-30s delay)
+- **Dead Letter Queue (DLQ)**: Rejected webhooks published to `webhooks.dlq` topic with rejection metadata
+- **Bulkhead Pattern**: Resource isolation to prevent thread pool exhaustion (configured)
+
 ### Worker Processing Framework
 - **Abstract Base Classes**: `AbstractWebhookEventListener` for simplified event consumption
-- **Idempotency Service**: Redis-based distributed idempotency using `lib-common-cache`
+- **Idempotency Service**: Redis-based distributed idempotency using `lib-common-cache` (7 days TTL)
 - **Signature Validation**: Provider-specific signature validation (Stripe, GitHub, etc.)
-- **Retry Logic**: Configurable retry strategies with exponential backoff
 - **Processing Lifecycle**: Hooks for before/after processing and error handling
 
-### Production Features
-- **Health Checks**: Actuator endpoints for Kafka, Redis, and application health
-- **Metrics**: Prometheus-compatible metrics via Micrometer
+### Advanced Features (NEW)
+- **Webhook Batching**: Automatic batching with configurable size and time windows
+- **Payload Compression**: GZIP compression for large payloads (>1KB)
+- **Metadata Enrichment**: User-Agent parsing, timestamps, request IDs
+
+### Observability & Monitoring
+- **Custom Metrics**: Detailed webhook metrics (received, published, processing time) via Micrometer
+- **Distributed Tracing**: Complete B3 propagation (HTTP → Kafka → Worker) with Zipkin backend
+- **Enhanced Health Checks**:
+  - Kafka connectivity with real cluster health check
+  - Redis read/write test for cache validation
+  - Separate liveness (`/actuator/health/liveness`) and readiness (`/actuator/health/readiness`) probes
+  - Circuit breaker state monitoring
+- **Structured Logging**: JSON-formatted logs with MDC correlation fields (traceId, spanId, transactionId)
+- **Prometheus Metrics**: Prometheus-compatible metrics export at `/actuator/prometheus`
 - **OpenAPI Documentation**: Interactive Swagger UI at `/swagger-ui.html`
-- **Distributed Caching**: Redis for idempotency and caching (with Caffeine fallback)
-- **Structured Logging**: JSON-formatted logs with correlation IDs
+
+### Performance & Optimization
+- **Webhook Batching**: Configurable batching with `bufferTimeout` for improved throughput (disabled by default)
+  - Per-provider batch size and wait time configuration
+  - Automatic flushing on size or time threshold
+- **Payload Compression**: GZIP compression for large payloads (>1KB) to reduce network bandwidth
+  - Configurable compression algorithm (GZIP, ZSTD, LZ4)
+  - Automatic compression/decompression in workers
+- **Metadata Enrichment**: Automatic enrichment of webhook events with:
+  - User-Agent parsing (browser, OS, device type, bot detection)
+  - High-precision timestamps (nanosecond precision)
+  - Unique request ID per webhook
+
+
 
 ## 🏗️ Architecture
 
@@ -187,9 +224,10 @@ The project follows a **multi-module Maven structure** with clear separation of 
 ```
 common-platform-webhooks-mgmt/
 ├── common-platform-webhooks-mgmt-interfaces/    # DTOs and API contracts
-├── common-platform-webhooks-mgmt-core/          # Business logic and domain events
+├── common-platform-webhooks-mgmt-core/          # Business logic, services, and configuration
 ├── common-platform-webhooks-mgmt-processor/     # Worker framework (ports & adapters)
-└── common-platform-webhooks-mgmt-web/           # REST API and Spring Boot application
+├── common-platform-webhooks-mgmt-web/           # Main application and REST controllers only
+└── common-platform-webhooks-mgmt-sdk/           # Java SDK (auto-generated from OpenAPI)
 ```
 
 ### Module Details
@@ -200,24 +238,56 @@ common-platform-webhooks-mgmt/
 **Key Components**:
 - `WebhookEventDTO` - Webhook event data transfer object
 - `WebhookResponseDTO` - HTTP response DTO
-- `WebhookEventQueryDTO` - Query result DTO
-- `WebhookEventFilterDTO` - Filter criteria DTO
 
 **Dependencies**: None (pure POJOs with Jackson annotations)
 
 #### 2. `common-platform-webhooks-mgmt-core`
-**Purpose**: Core business logic and domain events
+**Purpose**: Core business logic, services, configuration, and infrastructure
 
-**Key Components**:
-- `WebhookProcessingService` - Service interface for webhook processing
-- `WebhookProcessingServiceImpl` - Implementation that publishes to Kafka
-- `WebhookReceivedEvent` - Domain event representing a received webhook
-- `WebhookEventMapper` - MapStruct mapper for DTO ↔ Domain Event conversion
+**Package Structure**:
+```
+com.firefly.common.webhooks.core/
+├── config/                    # Configuration classes
+│   ├── ResilienceConfig.java           # Resilience4j configuration (circuit breaker, rate limiter, timeout)
+│   └── WebhookSecurityProperties.java  # Security configuration properties (env var support)
+├── domain/                    # Domain events
+│   └── events/
+│       └── WebhookReceivedEvent.java   # Domain event for received webhooks
+├── filter/                    # Web filters
+│   └── TracingWebFilter.java           # Distributed tracing filter (B3 propagation, MDC)
+├── health/                    # Health indicators
+│   └── WebhookCircuitBreakerHealthIndicator.java  # Circuit breaker health check
+├── idempotency/              # Idempotency services
+│   └── HttpIdempotencyService.java     # HTTP-level idempotency using X-Idempotency-Key
+├── mappers/                   # MapStruct mappers
+│   └── WebhookEventMapper.java         # DTO ↔ Domain Event conversion
+├── metrics/                   # Metrics services
+│   └── WebhookMetricsService.java      # Custom webhook metrics (Micrometer)
+├── ratelimit/                # Rate limiting
+│   └── WebhookRateLimitService.java    # Per-provider and per-IP rate limiting
+├── resilience/               # Resilience patterns
+│   └── ResilientWebhookProcessingService.java  # Circuit breaker + timeout decorator
+├── services/                  # Business services
+│   ├── WebhookProcessingService.java   # Service interface
+│   └── impl/
+│       └── WebhookProcessingServiceImpl.java  # Kafka publishing implementation
+└── validation/               # Validation services
+    └── WebhookValidator.java           # Payload size, provider name, IP whitelist validation
+```
 
-**Dependencies**: 
+**Key Features**:
+- **Resilience Patterns**: Circuit breaker, rate limiter, timeout, bulkhead (Resilience4j)
+- **Security**: Payload validation, rate limiting, IP whitelisting
+- **Observability**: Custom metrics, distributed tracing, health indicators
+- **Idempotency**: HTTP-level idempotency with Redis caching
+
+**Dependencies**:
 - `lib-common-eda` - Event publishing
+- `lib-common-cache` - Redis/Caffeine caching
 - `lib-common-core` - Core utilities
-- MapStruct for mapping
+- Resilience4j - Resilience patterns
+- Micrometer - Metrics
+- MapStruct - Mapping
 
 #### 3. `common-platform-webhooks-mgmt-processor`
 **Purpose**: Hexagonal architecture framework for building webhook workers
@@ -227,11 +297,11 @@ common-platform-webhooks-mgmt/
   - `WebhookProcessor` - Business logic processor interface
   - `WebhookIdempotencyService` - Idempotency service interface
   - `WebhookSignatureValidator` - Signature validation interface
-  
+
 - **Adapters** (Implementations):
   - `AbstractWebhookEventListener` - Base class for Kafka consumers
-  - `CacheBasedWebhookIdempotencyService` - Redis-based idempotency
-  
+  - `CacheBasedWebhookIdempotencyService` - Redis-based idempotency (7 days TTL)
+
 - **Models**:
   - `WebhookProcessingContext` - Context object with all webhook data
   - `WebhookProcessingResult` - Processing result with status
@@ -242,20 +312,35 @@ common-platform-webhooks-mgmt/
 - Spring Kafka
 
 #### 4. `common-platform-webhooks-mgmt-web`
-**Purpose**: REST API and Spring Boot application
+**Purpose**: Main Spring Boot application and REST controllers **ONLY**
 
 **Key Components**:
-- `WebhookManagementApplication` - Main Spring Boot application
-- `WebhookController` - REST controller for webhook ingestion
-- `application.yml` - Configuration file
+- `WebhookManagementApplication` - Main Spring Boot application class
+- `controllers/WebhookController` - REST controller for webhook ingestion
+- `application.yml` - Application configuration
+- `logback-spring.xml` - Logging configuration
+
+**Note**: All business logic, services, configuration, and infrastructure code has been moved to the `-core` module. This module contains only the application entry point and REST controllers.
 
 **Dependencies**:
+- `common-platform-webhooks-mgmt-core` - Core business logic
 - Spring Boot WebFlux
 - Spring Boot Actuator
 - SpringDoc OpenAPI
-- `lib-common-web` - Web utilities
-- `lib-common-eda` - Event publishing
-- `lib-common-cache` - Caching
+
+#### 5. `common-platform-webhooks-mgmt-sdk`
+**Purpose**: Auto-generated Java SDK for webhook platform API
+
+**Key Components**:
+- `WebhooksApi` - API client for webhook endpoints
+- `WebhookResponseDTO` - Response model
+- `ApiClient` - HTTP client configuration
+
+**Generation**: Auto-generated from OpenAPI specification using `openapi-generator-maven-plugin`
+
+**Dependencies**:
+- Jackson - JSON serialization
+- OkHttp - HTTP client
 
 ## 🛠️ Technology Stack
 
@@ -277,24 +362,38 @@ common-platform-webhooks-mgmt/
 - **RabbitMQ** - Alternative message broker (via lib-common-eda)
 
 ### Caching & Storage
-- **Redis 7+** - Distributed cache for idempotency
+- **Redis 7+** - Distributed cache for idempotency and HTTP-level caching
 - **Caffeine** - In-memory cache (fallback)
 
+### Resilience & Fault Tolerance
+- **Resilience4j** - Resilience patterns library
+  - Circuit Breaker - Prevents cascading failures
+  - Rate Limiter - Per-provider and per-IP rate limiting
+  - Time Limiter - Timeout protection
+  - Bulkhead - Resource isolation (configured)
+
 ### Observability
-- **Micrometer** - Metrics collection
+- **Micrometer** - Metrics collection and custom metrics
 - **Prometheus** - Metrics export
+- **Zipkin** - Distributed tracing backend
 - **Spring Boot Actuator** - Health checks and management endpoints
+- **Logback** - Structured JSON logging with MDC
 
 ### Development Tools
 - **MapStruct** - DTO mapping
 - **Lombok** - Boilerplate reduction
-- **SpringDoc OpenAPI** - API documentation
+- **SpringDoc OpenAPI** - API documentation and SDK generation
 - **JUnit 5** - Testing framework
-- **Testcontainers** - Integration testing with Docker
+- **Testcontainers** - Integration testing with Docker (Kafka + Redis)
 
 ## ⚙️ Configuration
 
 ### Environment Variables
+
+All configuration properties can be set via environment variables using Spring Boot's standard naming convention:
+- Replace dots (`.`) with underscores (`_`)
+- Convert to uppercase
+- Example: `firefly.webhooks.security.max-payload-size` → `FIREFLY_WEBHOOKS_SECURITY_MAX_PAYLOAD_SIZE`
 
 #### Required Configuration
 
@@ -308,6 +407,181 @@ REDIS_HOST=localhost
 REDIS_PORT=26379
 REDIS_SSL=false
 ```
+
+#### Security Configuration
+
+All security properties support environment variable configuration:
+
+```bash
+# Payload Size Validation
+FIREFLY_WEBHOOKS_SECURITY_MAX_PAYLOAD_SIZE=1048576              # Max payload size in bytes (default: 1MB)
+FIREFLY_WEBHOOKS_SECURITY_VALIDATE_PAYLOAD_SIZE=true            # Enable payload size validation
+
+# Provider Name Validation
+FIREFLY_WEBHOOKS_SECURITY_VALIDATE_PROVIDER_NAME=true           # Enable provider name validation
+FIREFLY_WEBHOOKS_SECURITY_PROVIDER_NAME_PATTERN="^[a-z0-9-]+$" # Regex pattern for provider names
+
+# IP Whitelisting (Optional)
+FIREFLY_WEBHOOKS_SECURITY_ENABLE_IP_WHITELIST=false             # Enable IP whitelist
+# IP whitelist per provider (JSON format) - supports exact IPs and CIDR notation:
+# FIREFLY_WEBHOOKS_SECURITY_IP_WHITELIST='{"stripe":["54.187.174.169","54.187.205.235"],"github":["192.30.252.0/22","185.199.108.0/22"]}'
+
+# HTTP Idempotency
+FIREFLY_WEBHOOKS_SECURITY_ENABLE_HTTP_IDEMPOTENCY=true          # Enable HTTP-level idempotency
+FIREFLY_WEBHOOKS_SECURITY_HTTP_IDEMPOTENCY_TTL_SECONDS=86400    # Idempotency cache TTL (default: 24h)
+
+# Request Validation
+FIREFLY_WEBHOOKS_SECURITY_ENABLE_REQUEST_VALIDATION=true        # Enable request validation
+FIREFLY_WEBHOOKS_SECURITY_REQUIRE_CONTENT_TYPE=true             # Require Content-Type header
+```
+
+#### Resilience Configuration
+
+```bash
+# Circuit Breaker (Kafka Publisher)
+RESILIENCE4J_CIRCUITBREAKER_INSTANCES_WEBHOOKKAFKAPUBLISHER_FAILURE_RATE_THRESHOLD=50
+RESILIENCE4J_CIRCUITBREAKER_INSTANCES_WEBHOOKKAFKAPUBLISHER_SLOW_CALL_RATE_THRESHOLD=50
+RESILIENCE4J_CIRCUITBREAKER_INSTANCES_WEBHOOKKAFKAPUBLISHER_SLOW_CALL_DURATION_THRESHOLD=5s
+RESILIENCE4J_CIRCUITBREAKER_INSTANCES_WEBHOOKKAFKAPUBLISHER_WAIT_DURATION_IN_OPEN_STATE=30s
+
+# Time Limiter (Timeout)
+RESILIENCE4J_TIMELIMITER_INSTANCES_WEBHOOKKAFKAPUBLISHER_TIMEOUT_DURATION=10s
+
+# Rate Limiter (Per Provider)
+RESILIENCE4J_RATELIMITER_INSTANCES_WEBHOOK_PROVIDER_DEFAULT_LIMIT_FOR_PERIOD=100
+RESILIENCE4J_RATELIMITER_INSTANCES_WEBHOOK_PROVIDER_DEFAULT_LIMIT_REFRESH_PERIOD=1s
+
+# Rate Limiter (Per IP)
+RESILIENCE4J_RATELIMITER_INSTANCES_WEBHOOK_IP_DEFAULT_LIMIT_FOR_PERIOD=100
+RESILIENCE4J_RATELIMITER_INSTANCES_WEBHOOK_IP_DEFAULT_LIMIT_REFRESH_PERIOD=1s
+```
+
+#### Dead Letter Queue (DLQ) Configuration
+
+```bash
+# Enable/disable DLQ for rejected webhooks
+FIREFLY_WEBHOOKS_DLQ_ENABLED=true
+
+# Kafka topic for rejected webhooks
+FIREFLY_WEBHOOKS_DLQ_TOPIC=webhooks.dlq
+```
+
+**DLQ Features**:
+- Captures webhooks that fail validation (signature, IP whitelist, payload size, etc.)
+- Stores webhooks that fail processing after max retries
+- Includes rejection metadata (reason, category, error details, retry count)
+- Enables manual inspection, debugging, and replay of failed webhooks
+
+**Rejection Categories**:
+- `VALIDATION_FAILURE` - Signature, IP whitelist, payload size violations
+- `PROCESSING_FAILURE` - Processing failures after max retries
+- `TIMEOUT_FAILURE` - Timeout or circuit breaker open
+- `UNRECOVERABLE_ERROR` - Malformed payload, missing required fields
+- `RATE_LIMIT_EXCEEDED` - Rate limit violations
+- `OTHER` - Unknown failures
+
+#### Retry Configuration
+
+```bash
+# Global retry defaults
+FIREFLY_WEBHOOKS_RETRY_MAX_ATTEMPTS=3
+FIREFLY_WEBHOOKS_RETRY_INITIAL_DELAY=PT1S          # 1 second
+FIREFLY_WEBHOOKS_RETRY_MAX_DELAY=PT30S             # 30 seconds
+FIREFLY_WEBHOOKS_RETRY_MULTIPLIER=2.0              # Exponential backoff multiplier
+FIREFLY_WEBHOOKS_RETRY_ENABLE_JITTER=true          # Enable jitter to prevent thundering herd
+FIREFLY_WEBHOOKS_RETRY_JITTER_FACTOR=0.5           # Jitter factor (0.0 to 1.0)
+
+# Retry conditions
+FIREFLY_WEBHOOKS_RETRY_ON_TIMEOUT=true
+FIREFLY_WEBHOOKS_RETRY_ON_CONNECTION_ERROR=true
+FIREFLY_WEBHOOKS_RETRY_ON_SERVER_ERROR=true
+FIREFLY_WEBHOOKS_RETRY_ON_CLIENT_ERROR=false       # Usually false for 4xx errors
+```
+
+**Retry Behavior**:
+- **Exponential Backoff**: Delay = `initialDelay * (multiplier ^ attemptNumber)`
+- **Jitter**: Randomizes retry delays to prevent thundering herd: `actualDelay = baseDelay * (1 + random(0, jitterFactor))`
+- **Max Delay Cap**: Ensures delays don't exceed `maxDelay`
+- **Per-Provider Overrides**: Configure different retry strategies per provider in YAML
+
+**Example Retry Delays** (with default config):
+- Attempt 1: 1s (+ 0-500ms jitter)
+- Attempt 2: 2s (+ 0-1s jitter)
+- Attempt 3: 4s (+ 0-2s jitter)
+
+#### Batching Configuration
+
+```bash
+# Enable/disable webhook batching
+FIREFLY_WEBHOOKS_BATCHING_ENABLED=false
+
+# Maximum number of events in a batch
+FIREFLY_WEBHOOKS_BATCHING_MAX_BATCH_SIZE=100
+
+# Maximum time to wait before flushing a batch
+FIREFLY_WEBHOOKS_BATCHING_MAX_WAIT_TIME=PT1S  # 1 second
+
+# Size of the internal buffer for pending events
+FIREFLY_WEBHOOKS_BATCHING_BUFFER_SIZE=1000
+```
+
+**Batching Behavior**:
+- **Buffer Timeout**: Events are batched using Project Reactor's `bufferTimeout(maxSize, maxTime)`
+- **Per-Destination Sinks**: Separate batching sinks for each destination (provider)
+- **Automatic Flushing**: Batches are flushed when either size or time threshold is reached
+- **Backpressure Handling**: Uses `onBackpressureBuffer` with configurable buffer size
+
+**Use Cases**:
+- High-throughput scenarios where batching improves Kafka publishing performance
+- Reducing network overhead by publishing multiple events in a single Kafka transaction
+- Optimizing for latency vs throughput trade-offs
+
+#### Compression Configuration
+
+```bash
+# Enable/disable payload compression
+FIREFLY_WEBHOOKS_COMPRESSION_ENABLED=false
+
+# Minimum payload size (in bytes) to trigger compression
+FIREFLY_WEBHOOKS_COMPRESSION_MIN_SIZE=1024  # 1KB
+
+# Compression algorithm (GZIP, ZSTD, LZ4)
+FIREFLY_WEBHOOKS_COMPRESSION_ALGORITHM=GZIP
+
+# Compression level (1-9 for GZIP)
+FIREFLY_WEBHOOKS_COMPRESSION_LEVEL=6
+```
+
+**Compression Behavior**:
+- **Automatic Compression**: Payloads exceeding `minSize` are automatically compressed
+- **Transparent Decompression**: Workers automatically decompress payloads
+- **Compression Ratio Tracking**: Metrics track compression effectiveness
+- **Algorithm Support**: GZIP (default), ZSTD (better compression), LZ4 (faster)
+
+**Benefits**:
+- Reduces network bandwidth for large webhook payloads
+- Decreases Kafka storage requirements
+- Improves throughput for high-volume scenarios
+
+#### Metadata Enrichment Configuration
+
+```bash
+# Enable/disable metadata enrichment
+FIREFLY_WEBHOOKS_METADATA_ENRICHMENT_ENABLED=true
+```
+
+**Enriched Metadata**:
+- **Request ID**: Unique UUID per webhook request
+- **Timestamp**: High-precision timestamp (nanosecond precision)
+- **Source IP**: Client IP address
+- **User-Agent Parsing**: Browser, OS, device type, bot detection
+- **Request Size**: Payload size in bytes
+
+**Use Cases**:
+- Debugging and troubleshooting webhook issues
+- Analytics and reporting on webhook sources
+- Security monitoring and fraud detection
+- Compliance and audit trail requirements
 
 #### Optional Configuration
 
@@ -331,6 +605,15 @@ REDIS_USERNAME=
 # Consumer Configuration (for workers)
 FIREFLY_CONSUMER_GROUP_ID=webhook-worker
 FIREFLY_EDA_CONSUMER_TYPE=KAFKA
+
+# Distributed Tracing
+MANAGEMENT_TRACING_ENABLED=true
+MANAGEMENT_TRACING_SAMPLING_PROBABILITY=1.0      # Sample 100% of requests (adjust for production)
+MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://localhost:9411/api/v2/spans
+
+# Metrics
+MANAGEMENT_METRICS_EXPORT_PROMETHEUS_ENABLED=true
+MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,prometheus,metrics
 ```
 
 ### Topic Routing Strategies
@@ -380,6 +663,50 @@ firefly:
 
 **Result**:
 - All providers → Kafka topic: `webhooks.all`
+
+### Security Configuration (YAML)
+
+Configure security features in `application.yml`:
+
+```yaml
+firefly:
+  webhooks:
+    security:
+      # Payload size validation
+      max-payload-size: 1048576  # 1MB in bytes
+      validate-payload-size: true
+
+      # Provider name validation
+      validate-provider-name: true
+      provider-name-pattern: "^[a-z0-9-]+$"
+
+      # IP whitelisting (supports exact IPs and CIDR notation)
+      enable-ip-whitelist: true
+      ip-whitelist:
+        stripe:
+          - "54.187.174.169"      # Exact IP
+          - "54.187.205.235"      # Exact IP
+        github:
+          - "192.30.252.0/22"     # CIDR notation
+          - "185.199.108.0/22"    # CIDR notation
+        paypal:
+          - "173.0.82.0/24"       # CIDR notation
+          - "64.4.240.0/21"       # CIDR notation
+
+      # HTTP-level idempotency
+      enable-http-idempotency: true
+      http-idempotency-ttl-seconds: 86400  # 24 hours
+
+      # Request validation
+      enable-request-validation: true
+      require-content-type: true
+```
+
+**IP Whitelisting Notes**:
+- Supports both exact IP addresses (e.g., `54.187.174.169`) and CIDR notation (e.g., `192.30.252.0/22`)
+- CIDR notation allows you to whitelist entire IP ranges efficiently
+- Uses Apache Commons Net for CIDR matching
+- Invalid IP addresses or CIDR notations are logged and rejected
 
 ## 📚 API Documentation
 
@@ -812,7 +1139,9 @@ This enhanced response format is particularly valuable for:
 
 ### Health Check Endpoints
 
-Spring Boot Actuator provides comprehensive health checks at `/actuator/health`:
+Spring Boot Actuator provides comprehensive health checks with **real connectivity tests**:
+
+#### Main Health Endpoint
 
 ```bash
 GET /actuator/health
@@ -823,16 +1152,33 @@ Response:
 {
   "status": "UP",
   "components": {
-    "kafka": {
+    "kafkaConnectivity": {
       "status": "UP",
       "details": {
-        "clusterId": "kafka-cluster-1"
+        "clusterId": "kafka-cluster-1",
+        "nodes": 3,
+        "status": "Connected"
       }
     },
-    "redis": {
+    "redisConnectivity": {
       "status": "UP",
       "details": {
+        "ping": "PONG",
+        "readWrite": "OK",
         "version": "7.0.0"
+      }
+    },
+    "readiness": {
+      "status": "UP",
+      "details": {
+        "status": "Ready to accept traffic",
+        "circuitBreakerState": "CLOSED"
+      }
+    },
+    "liveness": {
+      "status": "UP",
+      "details": {
+        "status": "Application is alive"
       }
     },
     "diskSpace": { "status": "UP" },
@@ -841,9 +1187,33 @@ Response:
 }
 ```
 
+#### Kubernetes Liveness Probe
+
+```bash
+GET /actuator/health/liveness
+```
+
+**Purpose**: Determines if the application should be restarted
+- Only checks basic application health
+- Does NOT check external dependencies (Kafka, Redis)
+- Always returns `UP` if application is running
+
+#### Kubernetes Readiness Probe
+
+```bash
+GET /actuator/health/readiness
+```
+
+**Purpose**: Determines if the application can accept traffic
+- Checks circuit breaker state
+- Returns `UP` if circuit breaker is CLOSED, HALF_OPEN, or DISABLED
+- Returns `DOWN` if circuit breaker is OPEN or FORCED_OPEN
+
 **Available Health Indicators**:
-- **Kafka**: Verifies Kafka broker connectivity
-- **Redis**: Verifies Redis connectivity (if enabled)
+- **kafkaConnectivity**: Real Kafka cluster health check (describes cluster, counts nodes)
+- **redisConnectivity**: Real Redis read/write test (PING, SET, GET, DEL operations)
+- **readiness**: Circuit breaker state for Kubernetes readiness probe
+- **liveness**: Basic application health for Kubernetes liveness probe
 - **Disk Space**: Monitors available disk space
 - **Ping**: Basic application liveness check
 
@@ -853,11 +1223,17 @@ management:
   endpoint:
     health:
       show-details: always  # Shows detailed health information
+      probes:
+        enabled: true       # Enable liveness and readiness probes
   health:
     redis:
       enabled: ${REDIS_HEALTH_ENABLED:true}
     rabbit:
       enabled: ${RABBITMQ_HEALTH_ENABLED:false}
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
 ```
 
 ### OpenAPI Documentation
@@ -1056,17 +1432,35 @@ firefly:
             compression-type: snappy
 ```
 
+
+
+
+
+
+
 ## 📊 Monitoring & Observability
 
-### Metrics
+### Custom Webhook Metrics
 
-Prometheus metrics are exposed at `/actuator/prometheus`:
+The platform exposes custom webhook metrics via Micrometer:
 
 ```bash
-curl http://localhost:8080/actuator/prometheus
+curl http://localhost:8080/actuator/prometheus | grep webhook
 ```
 
-Key metrics:
+**Custom Metrics**:
+- `webhook_received_total{provider="stripe"}` - Total webhooks received per provider
+- `webhook_published_total{provider="stripe"}` - Total webhooks published to Kafka per provider
+- `webhook_processing_time_seconds{provider="stripe"}` - Processing time histogram per provider
+
+**Resilience4j Metrics**:
+- `resilience4j_circuitbreaker_state{name="webhookKafkaPublisher"}` - Circuit breaker state (0=closed, 1=open, 2=half_open)
+- `resilience4j_circuitbreaker_calls_total{name="webhookKafkaPublisher",kind="successful"}` - Successful calls
+- `resilience4j_circuitbreaker_calls_total{name="webhookKafkaPublisher",kind="failed"}` - Failed calls
+- `resilience4j_ratelimiter_available_permissions{name="webhook-provider-stripe"}` - Available rate limit permits
+- `resilience4j_timelimiter_calls_total{name="webhookKafkaPublisher",kind="successful"}` - Timeout metrics
+
+**Standard Metrics**:
 - `http_server_requests_seconds` - HTTP request duration
 - `kafka_producer_record_send_total` - Kafka messages sent
 - `cache_gets_total` - Cache get operations
@@ -1075,22 +1469,110 @@ Key metrics:
 
 ### Health Checks
 
-Health checks available at `/actuator/health`:
+Comprehensive health checks available at `/actuator/health`:
 
 ```bash
 curl http://localhost:8080/actuator/health
 ```
 
-Components monitored:
-- Kafka connectivity
-- Redis connectivity (if enabled)
-- Disk space
-- Application liveness
+**Response Example**:
+```json
+{
+  "status": "UP",
+  "components": {
+    "webhookCircuitBreaker": {
+      "status": "UP",
+      "details": {
+        "circuitBreakerName": "webhookKafkaPublisher",
+        "state": "CLOSED",
+        "failureRate": "0.0%",
+        "slowCallRate": "0.0%",
+        "bufferedCalls": 10,
+        "failedCalls": 0,
+        "slowCalls": 0,
+        "notPermittedCalls": 0
+      }
+    },
+    "kafka": {
+      "status": "UP",
+      "details": {
+        "clusterId": "kafka-cluster-1"
+      }
+    },
+    "redis": {
+      "status": "UP",
+      "details": {
+        "version": "7.0.0"
+      }
+    },
+    "diskSpace": { "status": "UP" },
+    "ping": { "status": "UP" }
+  }
+}
+```
 
-### Logging
+**Health Indicators**:
+- **webhookCircuitBreaker**: Circuit breaker state and metrics
+- **kafka**: Kafka broker connectivity
+- **redis**: Redis connectivity (if enabled)
+- **diskSpace**: Available disk space
+- **ping**: Basic application liveness
+
+### Distributed Tracing
+
+The platform supports **complete end-to-end distributed tracing** with B3 propagation across the entire webhook processing pipeline:
+
+**Trace Flow**:
+1. **HTTP Request** → Trace context created/extracted from headers
+2. **Kafka Message** → Trace context propagated to Kafka message headers
+3. **Worker Processing** → Trace context extracted from Kafka headers and set in MDC
+
+**Trace Headers**:
+- `X-B3-TraceId` - Unique trace identifier (propagated across HTTP → Kafka → Worker)
+- `X-B3-SpanId` - Unique span identifier
+- `X-Request-ID` - Request ID for correlation
+
+**MDC Fields** (included in all logs):
+- `traceId` - Trace ID for correlation
+- `spanId` - Span ID for correlation
+- `requestId` - Request ID for business correlation
+
+**Kafka Message Headers** (automatically propagated):
+- `X-B3-TraceId` - Trace ID from HTTP request
+- `X-B3-SpanId` - Span ID from HTTP request
+- `X-Request-ID` - Request ID from HTTP request
+
+**Worker Trace Extraction**:
+Workers automatically extract trace context from Kafka message headers using `TracingContextExtractor`:
+
+```java
+// In your worker listener
+@Override
+protected void processEvent(WebhookReceivedEvent event, Message<?> message) {
+    // Trace context is automatically extracted and set in MDC
+    // All logs will include traceId, spanId, requestId
+    log.info("Processing webhook: {}", event.getEventId());
+}
+```
+
+**Zipkin Integration**:
+```bash
+# Configure Zipkin endpoint
+export MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://localhost:9411/api/v2/spans
+export MANAGEMENT_TRACING_SAMPLING_PROBABILITY=1.0  # Sample 100% (adjust for production)
+
+# View traces in Zipkin UI
+open http://localhost:9411/zipkin/
+```
+
+**Trace Visualization**:
+In Zipkin, you can see the complete trace from HTTP request → Kafka publish → Worker processing, with timing information for each step.
+
+### Structured Logging
 
 The application uses structured JSON logging with correlation IDs:
 
+**Log Format**:
 ```json
 {
   "timestamp": "2025-10-22T10:00:00.123Z",
@@ -1098,8 +1580,70 @@ The application uses structured JSON logging with correlation IDs:
   "logger": "com.firefly.common.webhooks.web.controllers.WebhookController",
   "message": "Webhook received",
   "eventId": "evt-456",
-  "providerName": "stripe"
+  "providerName": "stripe",
+  "traceId": "d85ad13a8f294eeba88630568721bcca",
+  "spanId": "b1866364ef3f43fb",
+  "transactionId": "30f7fe73-349a-4336-adc8-e5bd8bf80f51"
 }
+```
+
+**HTTP Request Logging**:
+```json
+{
+  "type": "HTTP_REQUEST",
+  "timestamp": "2025-10-22T14:00:38.347739Z",
+  "requestId": "951399678300500",
+  "method": "POST",
+  "path": "/api/v1/webhook/stripe",
+  "headers": {
+    "Content-Type": "application/json",
+    "Stripe-Signature": "t=**********,v1=3141dbd5...",
+    "X-Transaction-Id": "30f7fe73-349a-4336-adc8-e5bd8bf80f51"
+  }
+}
+```
+
+**HTTP Response Logging**:
+```json
+{
+  "type": "HTTP_RESPONSE",
+  "timestamp": "2025-10-22T14:00:38.579737Z",
+  "requestId": "951399678300500",
+  "statusCode": 202,
+  "durationMs": 232,
+  "headers": {
+    "X-B3-TraceId": "d85ad13a8f294eeba88630568721bcca",
+    "X-B3-SpanId": "b1866364ef3f43fb",
+    "X-Request-ID": "053291b8-0f03-4dbd-8942-4036c34857fb"
+  }
+}
+```
+
+
+
+## 📊 Monitoring & Observability
+
+### Prometheus Metrics
+
+The platform exposes comprehensive metrics:
+
+```
+# Request metrics
+webhook_received_total{provider="stripe",status="success"}
+webhook_received_rate{provider="stripe"}
+webhook_processing_latency_seconds{provider="stripe",quantile="0.95"}
+
+# DLQ metrics
+webhook_dlq_total{category="VALIDATION_FAILED"}
+webhook_dlq_rate
+
+# Batching metrics
+webhook_batch_size{provider="stripe"}
+webhook_batch_efficiency_ratio
+
+# Compression metrics
+webhook_compression_ratio{provider="stripe"}
+webhook_compression_bytes_saved_total
 ```
 
 ## 🤝 Contributing
@@ -1132,8 +1676,5 @@ For questions or issues:
 ## 🔗 Related Documentation
 
 - [Processor Framework Guide](common-platform-webhooks-mgmt-processor/README.md) - How to build webhook workers
-- [Architecture Documentation](ARCHITECTURE.md) - Detailed architecture and design decisions
-- [Configuration Guide](CONFIGURATION.md) - Complete configuration reference
-- [Development Guide](DEVELOPMENT.md) - Development setup and guidelines
-- [Deployment Guide](DEPLOYMENT.md) - Production deployment strategies
+- [Configuration Guide](CONFIGURATION_GUIDE.md) - Complete configuration reference for all features
 

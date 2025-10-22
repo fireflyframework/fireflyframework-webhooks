@@ -203,8 +203,6 @@ The platform separates write operations (commands) from read operations (queries
 │                    interfaces (DTOs)                         │
 │  - WebhookEventDTO                                           │
 │  - WebhookResponseDTO                                        │
-│  - WebhookEventQueryDTO                                      │
-│  - WebhookEventFilterDTO                                     │
 └────────────────────────┬─────────────────────────────────────┘
                          │
                          │ depends on
@@ -253,8 +251,6 @@ The platform separates write operations (commands) from read operations (queries
   - Timestamps (receivedAt, processedAt)
   - Payload echo (receivedPayload)
   - Processing metadata (destination, sourceIp, payloadSize, headerCount)
-- `WebhookEventQueryDTO`: Query result DTO
-- `WebhookEventFilterDTO`: Filter criteria DTO
 
 **Dependencies**: None (pure POJOs with Jackson annotations)
 
@@ -265,38 +261,76 @@ The platform separates write operations (commands) from read operations (queries
 - Validation annotations for input validation
 
 #### core Module
-**Purpose**: Business logic and domain events
+**Purpose**: Business logic, services, configuration, and infrastructure
 
-**Design Pattern**: Domain-Driven Design (DDD)
+**Design Patterns**:
+- Domain-Driven Design (DDD)
+- Decorator Pattern (Resilience)
+- Strategy Pattern (Validation)
 
-**Key Classes**:
-- `WebhookProcessingService`: Service interface
-- `WebhookProcessingServiceImpl`: Service implementation
-- `WebhookReceivedEvent`: Domain event
-- `WebhookEventMapper`: MapStruct mapper
+**Package Structure**:
+```
+com.firefly.common.webhooks.core/
+├── config/                    # Configuration classes
+│   ├── ResilienceConfig       # Resilience4j configuration
+│   └── WebhookSecurityProperties  # Security properties
+├── domain/events/             # Domain events
+│   └── WebhookReceivedEvent   # Webhook received event
+├── filter/                    # Web filters
+│   └── TracingWebFilter       # Distributed tracing
+├── health/                    # Health indicators
+│   └── WebhookCircuitBreakerHealthIndicator
+├── idempotency/              # Idempotency services
+│   └── HttpIdempotencyService # HTTP-level idempotency
+├── mappers/                   # MapStruct mappers
+│   └── WebhookEventMapper     # DTO ↔ Event mapping
+├── metrics/                   # Metrics services
+│   └── WebhookMetricsService  # Custom metrics
+├── ratelimit/                # Rate limiting
+│   └── WebhookRateLimitService
+├── resilience/               # Resilience patterns
+│   └── ResilientWebhookProcessingService
+├── services/                  # Business services
+│   ├── WebhookProcessingService
+│   └── impl/WebhookProcessingServiceImpl
+└── validation/               # Validation services
+    └── WebhookValidator       # Request validation
+```
+
+**Key Features**:
+- **Resilience Patterns**: Circuit breaker, rate limiter, timeout, bulkhead
+- **Security**: Payload validation, rate limiting, IP whitelisting
+- **Observability**: Custom metrics, distributed tracing, health indicators
+- **Idempotency**: HTTP-level idempotency with Redis caching
 
 **Dependencies**:
 - `lib-common-eda` - Event publishing
+- `lib-common-cache` - Redis/Caffeine caching
 - `lib-common-core` - Core utilities
+- Resilience4j - Resilience patterns
+- Micrometer - Metrics
 - MapStruct - DTO mapping
+- Apache Commons Net - CIDR notation IP matching
 
 **Design Decisions**:
-- Service interface for testability
-- Domain events for event sourcing
-- MapStruct for type-safe mapping
-- Reactive return types (Mono/Flux)
+- **Decorator Pattern**: `ResilientWebhookProcessingService` decorates `WebhookProcessingServiceImpl`
+- **Environment Variables**: All properties support environment variable configuration
+- **Reactive Programming**: All services return Mono/Flux for non-blocking operations
+- **Separation of Concerns**: Each package has a single responsibility
 
 #### web Module
-**Purpose**: REST API and Spring Boot application
+**Purpose**: Main Spring Boot application and REST controllers **ONLY**
 
 **Design Pattern**: MVC (Model-View-Controller)
 
 **Key Classes**:
-- `WebhookManagementApplication`: Main application
-- `WebhookController`: REST controller
-- `HealthCheckController`: Health check endpoints
+- `WebhookManagementApplication`: Main application class
+- `controllers/WebhookController`: REST controller for webhook ingestion
+
+**Note**: All business logic, services, configuration, and infrastructure code has been moved to the `-core` module. This module contains only the application entry point and REST controllers.
 
 **Dependencies**:
+- `common-platform-webhooks-mgmt-core` - Core business logic
 - Spring Boot WebFlux
 - Spring Boot Actuator
 - SpringDoc OpenAPI
@@ -643,17 +677,177 @@ Consumer Group: webhook-worker
 
 ## Security
 
+### Security Features
+
+The platform implements multiple layers of security:
+
+#### 1. Payload Size Validation
+
+**Purpose**: Prevent DoS attacks via large payloads
+
+**Configuration**:
+```yaml
+firefly:
+  webhooks:
+    security:
+      max-payload-size: 1048576        # 1MB (default)
+      validate-payload-size: true
+```
+
+**Environment Variable**:
+```bash
+FIREFLY_WEBHOOKS_SECURITY_MAX_PAYLOAD_SIZE=1048576
+FIREFLY_WEBHOOKS_SECURITY_VALIDATE_PAYLOAD_SIZE=true
+```
+
+**Behavior**: Returns HTTP 413 Payload Too Large if exceeded
+
+#### 2. Provider Name Validation
+
+**Purpose**: Prevent injection attacks via malicious provider names
+
+**Configuration**:
+```yaml
+firefly:
+  webhooks:
+    security:
+      validate-provider-name: true
+      provider-name-pattern: "^[a-z0-9-]+$"  # Alphanumeric and hyphens only
+```
+
+**Environment Variable**:
+```bash
+FIREFLY_WEBHOOKS_SECURITY_VALIDATE_PROVIDER_NAME=true
+FIREFLY_WEBHOOKS_SECURITY_PROVIDER_NAME_PATTERN="^[a-z0-9-]+$"
+```
+
+**Behavior**: Returns HTTP 400 Bad Request if invalid
+
+#### 3. IP Whitelisting
+
+**Purpose**: Restrict access to known provider IPs
+
+**Supported Formats**:
+- **Exact IP addresses**: `54.187.174.169`
+- **CIDR notation**: `192.30.252.0/22` (matches entire IP ranges)
+
+**Implementation**:
+- Uses Apache Commons Net library (`SubnetUtils`) for CIDR matching
+- Validates both exact IP matches and CIDR range matches
+- Logs warnings for invalid IP addresses or CIDR notations
+- Configured per provider for granular control
+
+**Configuration**:
+```yaml
+firefly:
+  webhooks:
+    security:
+      enable-ip-whitelist: true
+      ip-whitelist:
+        stripe:
+          - "54.187.174.169"      # Exact IP
+          - "54.187.205.235"      # Exact IP
+        github:
+          - "192.30.252.0/22"     # CIDR notation (192.30.252.0 - 192.30.255.255)
+          - "185.199.108.0/22"    # CIDR notation (185.199.108.0 - 185.199.111.255)
+        paypal:
+          - "173.0.82.0/24"       # CIDR notation (173.0.82.0 - 173.0.82.255)
+```
+
+**Environment Variable**:
+```bash
+FIREFLY_WEBHOOKS_SECURITY_ENABLE_IP_WHITELIST=true
+# Supports both exact IPs and CIDR notation
+FIREFLY_WEBHOOKS_SECURITY_IP_WHITELIST='{"stripe":["54.187.174.169","54.187.205.235"],"github":["192.30.252.0/22","185.199.108.0/22"]}'
+```
+
+**Behavior**: Returns HTTP 403 Forbidden if IP not whitelisted
+
+**Example CIDR Ranges**:
+- `/32` - Single IP (e.g., `192.168.1.1/32` = only `192.168.1.1`)
+- `/24` - 256 IPs (e.g., `192.168.1.0/24` = `192.168.1.0` - `192.168.1.255`)
+- `/22` - 1024 IPs (e.g., `192.30.252.0/22` = `192.30.252.0` - `192.30.255.255`)
+- `/16` - 65,536 IPs (e.g., `10.0.0.0/16` = `10.0.0.0` - `10.0.255.255`)
+
+#### 4. Rate Limiting
+
+**Purpose**: Prevent abuse and DoS attacks
+
+**Per-Provider Rate Limiting**:
+- Default: 100 requests/second per provider
+- Configurable per provider via Resilience4j
+
+**Per-IP Rate Limiting**:
+- Default: 100 requests/second per IP address
+- Prevents single IP from overwhelming the system
+
+**Behavior**: Returns HTTP 429 Too Many Requests if exceeded
+
+#### 5. HTTP-level Idempotency
+
+**Purpose**: Prevent duplicate processing of the same webhook
+
+**Configuration**:
+```yaml
+firefly:
+  webhooks:
+    security:
+      enable-http-idempotency: true
+      http-idempotency-ttl-seconds: 86400  # 24 hours
+```
+
+**Environment Variable**:
+```bash
+FIREFLY_WEBHOOKS_SECURITY_ENABLE_HTTP_IDEMPOTENCY=true
+FIREFLY_WEBHOOKS_SECURITY_HTTP_IDEMPOTENCY_TTL_SECONDS=86400
+```
+
+**Usage**:
+```bash
+curl -X POST http://localhost:8080/api/v1/webhook/stripe \
+  -H "Content-Type: application/json" \
+  -H "X-Idempotency-Key: unique-key-123" \
+  -d '{"event": "payment.succeeded"}'
+```
+
+**Behavior**:
+- First request: Processes webhook and caches response
+- Duplicate requests (within 24h): Returns cached response (HTTP 200)
+
+#### 6. Content-Type Validation
+
+**Purpose**: Ensure proper content type headers
+
+**Configuration**:
+```yaml
+firefly:
+  webhooks:
+    security:
+      enable-request-validation: true
+      require-content-type: true
+```
+
+**Environment Variable**:
+```bash
+FIREFLY_WEBHOOKS_SECURITY_ENABLE_REQUEST_VALIDATION=true
+FIREFLY_WEBHOOKS_SECURITY_REQUIRE_CONTENT_TYPE=true
+```
+
+**Behavior**: Returns HTTP 400 Bad Request if Content-Type header missing
+
 ### Authentication & Authorization
 
-#### Webhook Platform
+#### Webhook Platform (Ingestion)
 - **No Authentication**: Webhook providers don't support OAuth/JWT
-- **IP Whitelisting**: Restrict access to known provider IPs (optional)
-- **Rate Limiting**: Prevent abuse (via API Gateway)
+- **IP Whitelisting**: Restrict access to known provider IPs (optional, configurable)
+- **Rate Limiting**: Prevent abuse (per-provider and per-IP)
+- **Payload Validation**: Validate payload size, provider name, content-type
 
-#### Worker Applications
-- **Signature Validation**: Verify webhook signatures
+#### Worker Applications (Processing)
+- **Signature Validation**: Verify webhook signatures (provider-specific)
 - **HMAC SHA256**: Most providers use HMAC SHA256
 - **Timestamp Validation**: Reject old webhooks (prevent replay attacks)
+- **Idempotency**: Prevent duplicate processing using Redis locks (7 days TTL)
 
 ### Signature Validation
 
@@ -702,20 +896,174 @@ boolean valid = signature.equals(expectedSignature);
 
 ## Error Handling & Resilience
 
+### Resilience Patterns Implementation
+
+The platform implements comprehensive resilience patterns using **Resilience4j**:
+
+#### 1. Circuit Breaker
+
+**Purpose**: Prevents cascading failures when Kafka is down
+
+**Configuration**:
+```yaml
+resilience4j:
+  circuitbreaker:
+    instances:
+      webhookKafkaPublisher:
+        failure-rate-threshold: 50          # Open circuit if 50% of calls fail
+        slow-call-rate-threshold: 50        # Open circuit if 50% of calls are slow
+        slow-call-duration-threshold: 5s    # Call is slow if > 5 seconds
+        wait-duration-in-open-state: 30s    # Wait 30s before trying half-open
+        permitted-number-of-calls-in-half-open-state: 5
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+```
+
+**Implementation**:
+```java
+@Service
+@Primary
+public class ResilientWebhookProcessingService implements WebhookProcessingService {
+
+    private final WebhookProcessingService delegate;
+    private final CircuitBreaker circuitBreaker;
+    private final TimeLimiter timeLimiter;
+
+    @Override
+    public Mono<WebhookResponseDTO> processWebhook(WebhookEventDTO webhookEvent) {
+        return Mono.fromCallable(() ->
+            circuitBreaker.decorateSupplier(() ->
+                timeLimiter.executeFutureSupplier(() ->
+                    delegate.processWebhook(webhookEvent).toFuture()
+                )
+            ).get()
+        ).flatMap(Mono::fromFuture);
+    }
+}
+```
+
+**Behavior**:
+- **CLOSED**: Normal operation, all requests pass through
+- **OPEN**: Circuit is open, requests fail immediately (no fallback, relies on lib-common-eda)
+- **HALF_OPEN**: Testing if service recovered, limited requests allowed
+
+**Health Check**:
+```json
+{
+  "webhookCircuitBreaker": {
+    "status": "UP",
+    "details": {
+      "circuitBreakerName": "webhookKafkaPublisher",
+      "state": "CLOSED",
+      "failureRate": "0.0%",
+      "slowCallRate": "0.0%"
+    }
+  }
+}
+```
+
+#### 2. Rate Limiting
+
+**Purpose**: Protects against abuse and DoS attacks
+
+**Per-Provider Rate Limiting**:
+```yaml
+resilience4j:
+  ratelimiter:
+    instances:
+      webhook-provider-default:
+        limit-for-period: 100        # 100 requests
+        limit-refresh-period: 1s     # per second
+        timeout-duration: 0s         # Fail immediately if limit exceeded
+```
+
+**Per-IP Rate Limiting**:
+```yaml
+resilience4j:
+  ratelimiter:
+    instances:
+      webhook-ip-default:
+        limit-for-period: 100        # 100 requests
+        limit-refresh-period: 1s     # per second
+        timeout-duration: 0s
+```
+
+**Implementation**:
+```java
+@Service
+public class WebhookRateLimitService {
+
+    public Mono<Void> checkRateLimit(String providerName, String ipAddress) {
+        return Mono.fromRunnable(() -> {
+            // Check provider rate limit
+            RateLimiter providerLimiter = getRateLimiter("webhook-provider-" + providerName);
+            if (!providerLimiter.acquirePermission()) {
+                throw new RateLimitExceededException("Provider rate limit exceeded");
+            }
+
+            // Check IP rate limit
+            RateLimiter ipLimiter = getRateLimiter("webhook-ip-" + ipAddress);
+            if (!ipLimiter.acquirePermission()) {
+                throw new RateLimitExceededException("IP rate limit exceeded");
+            }
+        });
+    }
+}
+```
+
+**Response**: HTTP 429 Too Many Requests
+
+#### 3. Timeout Protection
+
+**Purpose**: Prevents hanging operations
+
+**Configuration**:
+```yaml
+resilience4j:
+  timelimiter:
+    instances:
+      webhookKafkaPublisher:
+        timeout-duration: 10s        # Timeout after 10 seconds
+        cancel-running-future: true  # Cancel the future on timeout
+```
+
+**Behavior**:
+- If Kafka publishing takes > 10 seconds, the operation times out
+- Returns HTTP 500 to webhook sender
+- Webhook sender should retry
+
+#### 4. Bulkhead Pattern
+
+**Purpose**: Resource isolation to prevent thread pool exhaustion
+
+**Configuration** (configured but not yet fully implemented):
+```yaml
+resilience4j:
+  bulkhead:
+    instances:
+      webhookProcessing:
+        max-concurrent-calls: 100    # Max 100 concurrent webhook processing calls
+        max-wait-duration: 0s        # Don't wait if limit reached
+```
+
 ### Error Handling Strategy
 
-#### Webhook Platform
-- **Fail Fast**: Return 500 if Kafka is unavailable
-- **No Retries**: Don't retry failed publishes (let provider retry)
-- **Logging**: Log all errors with correlation IDs
+#### Webhook Platform (Ingestion)
+- **Circuit Breaker**: Fails fast if Kafka is unavailable (no fallback)
+- **Timeout**: Returns 500 if publishing takes > 10 seconds
+- **Rate Limiting**: Returns 429 if rate limit exceeded
+- **Validation Errors**: Returns 400 for invalid payloads
+- **Logging**: All errors logged with correlation IDs (traceId, spanId, transactionId)
 
-#### Worker Applications
+#### Worker Applications (Processing)
 - **Retry Logic**: Retry transient failures with exponential backoff
 - **Dead Letter Queue**: Move failed messages to DLQ after max retries
 - **Circuit Breaker**: Stop processing if downstream service is down
 - **Graceful Degradation**: Continue processing other events
+- **Idempotency**: Prevent duplicate processing using Redis locks
 
-### Retry Strategy
+### Retry Strategy (Worker Applications)
 
 ```java
 public Mono<WebhookProcessingResult> process(WebhookProcessingContext context) {
@@ -724,23 +1072,6 @@ public Mono<WebhookProcessingResult> process(WebhookProcessingContext context) {
             .filter(throwable -> isTransientError(throwable))
             .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) ->
                 new MaxRetriesExceededException("Max retries exceeded")));
-}
-```
-
-### Circuit Breaker
-
-```java
-@CircuitBreaker(name = "payment-service", fallbackMethod = "fallback")
-public Mono<PaymentResult> callPaymentService(PaymentRequest request) {
-    return webClient.post()
-        .uri("/payments")
-        .bodyValue(request)
-        .retrieve()
-        .bodyToMono(PaymentResult.class);
-}
-
-public Mono<PaymentResult> fallback(PaymentRequest request, Exception ex) {
-    return Mono.just(PaymentResult.failed("Service unavailable"));
 }
 ```
 
