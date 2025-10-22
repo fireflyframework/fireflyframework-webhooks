@@ -17,6 +17,8 @@
 package com.firefly.common.webhooks.web.controllers;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.firefly.common.webhooks.core.domain.WebhookMetadata;
+import com.firefly.common.webhooks.core.services.WebhookMetadataEnrichmentService;
 import com.firefly.common.webhooks.core.services.WebhookProcessingService;
 import com.firefly.common.webhooks.interfaces.dto.WebhookEventDTO;
 import com.firefly.common.webhooks.interfaces.dto.WebhookResponseDTO;
@@ -34,6 +36,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
@@ -74,6 +77,7 @@ public class WebhookController {
     private final HttpIdempotencyService httpIdempotencyService;
     private final WebhookMetricsService metricsService;
     private final com.firefly.common.webhooks.core.ratelimit.WebhookRateLimitService rateLimitService;
+    private final WebhookMetadataEnrichmentService metadataEnrichmentService;
 
     /**
      * Universal webhook endpoint that accepts webhooks from any provider.
@@ -94,14 +98,13 @@ public class WebhookController {
      * @param payload the raw webhook payload as JSON
      * @param request the HTTP request for extracting headers and metadata
      * @param queryParams query parameters from the request
-     * @return a Mono containing the webhook response
+     * @return a Mono containing the ResponseEntity with webhook response
      */
     @PostMapping(
             value = "/{providerName}",
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE
     )
-    @ResponseStatus(HttpStatus.ACCEPTED)
     @Operation(
             summary = "Receive webhook from any provider",
             description = "Universal endpoint that accepts webhooks from any provider. " +
@@ -120,7 +123,7 @@ public class WebhookController {
             responseCode = "500",
             description = "Internal server error"
     )
-    public Mono<WebhookResponseDTO> receiveWebhook(
+    public Mono<ResponseEntity<WebhookResponseDTO>> receiveWebhook(
             @Parameter(description = "Name of the webhook provider", example = "stripe", required = true)
             @PathVariable String providerName,
             @Parameter(description = "Raw webhook payload", required = true)
@@ -177,6 +180,7 @@ public class WebhookController {
                         })
                 )
         )
+        .map(response -> ResponseEntity.status(HttpStatus.ACCEPTED).body(response))
         .doFinally(signal -> {
             MDC.remove("eventId");
             MDC.remove("provider");
@@ -202,6 +206,12 @@ public class WebhookController {
         long payloadSize = payload.toString().getBytes().length;
         metricsService.recordPayloadSize(providerName, payloadSize);
 
+        // Extract source IP
+        String sourceIp = extractSourceIp(request);
+
+        // Enrich metadata with User-Agent parsing, timestamps, etc.
+        WebhookMetadata enrichedMetadata = metadataEnrichmentService.enrich(request, sourceIp);
+
         // Build webhook event DTO
         WebhookEventDTO eventDto = WebhookEventDTO.builder()
                 .eventId(eventId)
@@ -210,13 +220,20 @@ public class WebhookController {
                 .headers(headers)
                 .queryParams(extractQueryParams(queryParams))
                 .receivedAt(startTime)
-                .sourceIp(extractSourceIp(request))
+                .sourceIp(sourceIp)
                 .httpMethod(request.getMethod().name())
+                .enrichedMetadata(convertMetadataToMap(enrichedMetadata))
                 .build();
 
         // Process the webhook
         return webhookProcessingService.processWebhook(eventDto)
                 .flatMap(response -> {
+                    // Calculate response time and add to metadata
+                    long responseTimeMs = java.time.Duration.between(startTime, Instant.now()).toMillis();
+                    if (response.getMetadata() != null) {
+                        response.getMetadata().put("responseTimeMs", responseTimeMs);
+                    }
+
                     // Cache response if idempotency key provided
                     if (idempotencyKey != null) {
                         return httpIdempotencyService.cacheResponse(idempotencyKey, response)
@@ -294,5 +311,43 @@ public class WebhookController {
         }
 
         return "unknown";
+    }
+
+    /**
+     * Converts WebhookMetadata to Map for DTO.
+     *
+     * @param metadata the metadata object
+     * @return map representation
+     */
+    private Map<String, Object> convertMetadataToMap(WebhookMetadata metadata) {
+        if (metadata == null) {
+            return null;
+        }
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("requestId", metadata.getRequestId());
+        map.put("receivedAtNanos", metadata.getReceivedAtNanos());
+        map.put("sourceIp", metadata.getSourceIp());
+        map.put("requestSize", metadata.getRequestSize());
+
+        // responseTimeMs will be null here (calculated later in the response)
+        if (metadata.getResponseTimeMs() != null) {
+            map.put("responseTimeMs", metadata.getResponseTimeMs());
+        }
+
+        if (metadata.getUserAgent() != null) {
+            Map<String, Object> userAgentMap = new HashMap<>();
+            userAgentMap.put("raw", metadata.getUserAgent().getRaw());
+            userAgentMap.put("browser", metadata.getUserAgent().getBrowser());
+            userAgentMap.put("browserVersion", metadata.getUserAgent().getBrowserVersion());
+            userAgentMap.put("os", metadata.getUserAgent().getOs());
+            userAgentMap.put("osVersion", metadata.getUserAgent().getOsVersion());
+            userAgentMap.put("device", metadata.getUserAgent().getDevice());
+            userAgentMap.put("deviceType", metadata.getUserAgent().getDeviceType());
+            userAgentMap.put("isBot", metadata.getUserAgent().isBot());
+            map.put("userAgent", userAgentMap);
+        }
+
+        return map;
     }
 }
