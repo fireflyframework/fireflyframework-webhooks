@@ -103,11 +103,14 @@ firefly:
 # Logging Configuration
 logging:
   level:
-    root: INFO
-    com.firefly.common.webhooks: DEBUG
-    com.firefly.common.eda: DEBUG
-    com.firefly.common.cache: DEBUG
-    org.apache.kafka: WARN
-    org.testcontainers: INFO
+    root: WARN
+    com.firefly.common.webhooks: INFO
+    com.firefly.common.eda: WARN
+    com.firefly.common.cache: WARN
+    org.apache.kafka: ERROR
+    org.testcontainers: WARN
+    org.springframework: WARN
+    io.lettuce: ERROR
+    reactor.netty: ERROR
   pattern:
-    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%clr(%d{HH:mm:ss.SSS}){faint} %clr(%-5level) %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} : %msg%n"
