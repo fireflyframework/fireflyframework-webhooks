@@ -469,6 +469,40 @@ curl -X POST http://localhost:8080/api/v1/webhook/stripe \
   }'
 ```
 
+**Response**: `202 ACCEPTED`
+```json
+{
+  "eventId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "status": "ACCEPTED",
+  "message": "Webhook received and queued for processing",
+  "receivedAt": "2025-10-22T10:00:00.123Z",
+  "processedAt": "2025-10-22T10:00:00.456Z",
+  "providerName": "stripe",
+  "receivedPayload": {
+    "id": "evt_1234567890",
+    "type": "payment_intent.succeeded",
+    "data": {
+      "object": {
+        "id": "pi_1234567890",
+        "amount": 2000,
+        "currency": "usd",
+        "status": "succeeded",
+        "customer": "cus_123456",
+        "description": "Payment for order #12345"
+      }
+    },
+    "created": 1234567890
+  },
+  "metadata": {
+    "destination": "stripe",
+    "sourceIp": "192.168.1.100",
+    "httpMethod": "POST",
+    "payloadSize": 245,
+    "headerCount": 3
+  }
+}
+```
+
 #### Example 2: Stripe Subscription Created
 ```bash
 curl -X POST http://localhost:8080/api/v1/webhook/stripe \
@@ -527,6 +561,53 @@ curl -X POST http://localhost:8080/api/v1/webhook/github \
       "full_name": "octocat/my-repo"
     }
   }'
+```
+
+**Response**: `202 ACCEPTED`
+```json
+{
+  "eventId": "f9e8d7c6-b5a4-3210-9876-543210fedcba",
+  "status": "ACCEPTED",
+  "message": "Webhook received and queued for processing",
+  "receivedAt": "2025-10-22T10:05:30.789Z",
+  "processedAt": "2025-10-22T10:05:30.891Z",
+  "providerName": "github",
+  "receivedPayload": {
+    "action": "opened",
+    "number": 42,
+    "pull_request": {
+      "id": 1,
+      "number": 42,
+      "title": "Add new feature",
+      "state": "open",
+      "user": {
+        "login": "octocat",
+        "id": 1
+      },
+      "head": {
+        "ref": "feature-branch",
+        "sha": "abc123"
+      },
+      "base": {
+        "ref": "main",
+        "sha": "def456"
+      }
+    },
+    "repository": {
+      "id": 123456,
+      "name": "my-repo",
+      "full_name": "octocat/my-repo"
+    }
+  },
+  "metadata": {
+    "destination": "github",
+    "sourceIp": "140.82.115.1",
+    "httpMethod": "POST",
+    "payloadSize": 412,
+    "headerCount": 5,
+    "correlationId": "12345678-1234-1234-1234-123456789012"
+  }
+}
 ```
 
 #### Example 4: GitHub Push Event
@@ -626,11 +707,66 @@ curl -X POST http://localhost:8080/api/v1/webhook/my-custom-provider \
   }'
 ```
 
+**Response**: `202 ACCEPTED`
+```json
+{
+  "eventId": "1a2b3c4d-5e6f-7890-abcd-1234567890ab",
+  "status": "ACCEPTED",
+  "message": "Webhook received and queued for processing",
+  "receivedAt": "2025-10-22T10:15:45.234Z",
+  "processedAt": "2025-10-22T10:15:45.345Z",
+  "providerName": "my-custom-provider",
+  "receivedPayload": {
+    "event_type": "user.created",
+    "user_id": "12345",
+    "email": "user@example.com",
+    "timestamp": "2025-10-22T10:00:00Z",
+    "metadata": {
+      "source": "web",
+      "ip_address": "192.168.1.1"
+    }
+  },
+  "metadata": {
+    "destination": "my-custom-provider",
+    "sourceIp": "192.168.1.1",
+    "httpMethod": "POST",
+    "payloadSize": 178,
+    "headerCount": 4
+  }
+}
+```
+
 #### Example 8: Twilio SMS Webhook
 ```bash
 curl -X POST http://localhost:8080/api/v1/webhook/twilio \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d 'MessageSid=SM1234567890&From=%2B15551234567&To=%2B15559876543&Body=Hello+World&MessageStatus=received'
+```
+
+**Response**: `202 ACCEPTED`
+```json
+{
+  "eventId": "9z8y7x6w-5v4u-3t2s-1r0q-ponmlkjihgfe",
+  "status": "ACCEPTED",
+  "message": "Webhook received and queued for processing",
+  "receivedAt": "2025-10-22T10:20:12.567Z",
+  "processedAt": "2025-10-22T10:20:12.678Z",
+  "providerName": "twilio",
+  "receivedPayload": {
+    "MessageSid": "SM1234567890",
+    "From": "+15551234567",
+    "To": "+15559876543",
+    "Body": "Hello World",
+    "MessageStatus": "received"
+  },
+  "metadata": {
+    "destination": "twilio",
+    "sourceIp": "54.172.60.0",
+    "httpMethod": "POST",
+    "payloadSize": 112,
+    "headerCount": 2
+  }
+}
 ```
 
 **Note**: The platform accepts both JSON and form-encoded payloads. All data is preserved as-is and published to Kafka.

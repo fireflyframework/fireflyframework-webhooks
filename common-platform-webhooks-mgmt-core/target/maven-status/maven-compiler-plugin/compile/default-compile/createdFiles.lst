@@ -1,6 +1,0 @@
-com/firefly/common/webhooks/core/mappers/WebhookEventMapper.class
-com/firefly/common/webhooks/core/domain/events/WebhookReceivedEvent$WebhookReceivedEventBuilder.class
-com/firefly/common/webhooks/core/domain/events/WebhookReceivedEvent.class
-com/firefly/common/webhooks/core/services/impl/WebhookProcessingServiceImpl.class
-com/firefly/common/webhooks/core/services/WebhookProcessingService.class
-com/firefly/common/webhooks/core/mappers/WebhookEventMapperImpl.class

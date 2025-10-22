@@ -1,8 +1,0 @@
-com/firefly/common/webhooks/interfaces/dto/WebhookEventDTO.class
-com/firefly/common/webhooks/interfaces/dto/WebhookEventQueryDTO.class
-com/firefly/common/webhooks/interfaces/dto/WebhookResponseDTO$WebhookResponseDTOBuilder.class
-com/firefly/common/webhooks/interfaces/dto/WebhookEventDTO$WebhookEventDTOBuilder.class
-com/firefly/common/webhooks/interfaces/dto/WebhookEventQueryDTO$WebhookEventQueryDTOBuilder.class
-com/firefly/common/webhooks/interfaces/dto/WebhookEventFilterDTO$WebhookEventFilterDTOBuilder.class
-com/firefly/common/webhooks/interfaces/dto/WebhookEventFilterDTO.class
-com/firefly/common/webhooks/interfaces/dto/WebhookResponseDTO.class
