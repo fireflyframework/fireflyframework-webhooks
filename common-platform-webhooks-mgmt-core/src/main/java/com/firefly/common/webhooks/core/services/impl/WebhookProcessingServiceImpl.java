@@ -30,6 +30,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -65,11 +66,20 @@ public class WebhookProcessingServiceImpl implements WebhookProcessingService {
         // Convert DTO to domain event
         WebhookReceivedEvent domainEvent = webhookEventMapper.toDomainEvent(eventDto);
 
+        // Resolve destination for metadata
+        String destination = resolveDestination(eventDto.getProviderName());
+
+        // Build metadata for response
+        Map<String, Object> metadata = buildResponseMetadata(eventDto, destination);
+
         // Publish directly to queue
         return publishToQueue(domainEvent)
                 .then(Mono.just(WebhookResponseDTO.success(
                         eventDto.getEventId(),
-                        eventDto.getProviderName()
+                        eventDto.getProviderName(),
+                        eventDto.getReceivedAt(),
+                        eventDto.getPayload(),
+                        metadata
                 )))
                 .doOnSuccess(response ->
                         log.info("Successfully processed webhook {} from provider: {}",
@@ -80,9 +90,41 @@ public class WebhookProcessingServiceImpl implements WebhookProcessingService {
                     return Mono.just(WebhookResponseDTO.error(
                             eventDto.getEventId(),
                             eventDto.getProviderName(),
-                            "Error processing webhook: " + error.getMessage()
+                            "Error processing webhook: " + error.getMessage(),
+                            eventDto.getReceivedAt(),
+                            eventDto.getPayload()
                     ));
                 });
+    }
+
+    /**
+     * Builds metadata for the webhook response.
+     *
+     * @param eventDto the webhook event DTO
+     * @param destination the resolved destination topic/queue
+     * @return metadata map
+     */
+    private Map<String, Object> buildResponseMetadata(WebhookEventDTO eventDto, String destination) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("destination", destination);
+        metadata.put("sourceIp", eventDto.getSourceIp());
+        metadata.put("httpMethod", eventDto.getHttpMethod());
+
+        if (eventDto.getCorrelationId() != null) {
+            metadata.put("correlationId", eventDto.getCorrelationId());
+        }
+
+        // Add payload size information
+        if (eventDto.getPayload() != null) {
+            metadata.put("payloadSize", eventDto.getPayload().toString().length());
+        }
+
+        // Add header count
+        if (eventDto.getHeaders() != null) {
+            metadata.put("headerCount", eventDto.getHeaders().size());
+        }
+
+        return metadata;
     }
 
     /**
