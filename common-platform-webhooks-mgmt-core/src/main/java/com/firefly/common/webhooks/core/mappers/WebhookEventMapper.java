@@ -16,16 +16,24 @@
 
 package com.firefly.common.webhooks.core.mappers;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.firefly.common.webhooks.core.domain.WebhookMetadata;
 import com.firefly.common.webhooks.core.domain.events.WebhookReceivedEvent;
 import com.firefly.common.webhooks.interfaces.dto.WebhookEventDTO;
 import org.mapstruct.Mapper;
 import org.mapstruct.MappingConstants;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.Map;
 
 /**
  * MapStruct mapper for converting between webhook DTOs and domain events.
  */
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
-public interface WebhookEventMapper {
+public abstract class WebhookEventMapper {
+
+    @Autowired
+    protected ObjectMapper objectMapper;
 
     /**
      * Converts a WebhookEventDto to a WebhookReceivedEvent.
@@ -33,7 +41,7 @@ public interface WebhookEventMapper {
      * @param dto the DTO
      * @return the domain event
      */
-    WebhookReceivedEvent toDomainEvent(WebhookEventDTO dto);
+    public abstract WebhookReceivedEvent toDomainEvent(WebhookEventDTO dto);
 
     /**
      * Converts a WebhookReceivedEvent to a WebhookEventDto.
@@ -41,5 +49,32 @@ public interface WebhookEventMapper {
      * @param event the domain event
      * @return the DTO
      */
-    WebhookEventDTO toDto(WebhookReceivedEvent event);
+    public abstract WebhookEventDTO toDto(WebhookReceivedEvent event);
+
+    /**
+     * Converts WebhookMetadata to Map for DTO.
+     *
+     * @param metadata the metadata object
+     * @return map representation
+     */
+    @SuppressWarnings("unchecked")
+    protected Map<String, Object> metadataToMap(WebhookMetadata metadata) {
+        if (metadata == null) {
+            return null;
+        }
+        return objectMapper.convertValue(metadata, Map.class);
+    }
+
+    /**
+     * Converts Map to WebhookMetadata from DTO.
+     *
+     * @param map the map representation
+     * @return metadata object
+     */
+    protected WebhookMetadata mapToMetadata(Map<String, Object> map) {
+        if (map == null) {
+            return null;
+        }
+        return objectMapper.convertValue(map, WebhookMetadata.class);
+    }
 }

@@ -20,14 +20,19 @@ import com.firefly.common.eda.publisher.EventPublisher;
 import com.firefly.common.eda.publisher.EventPublisherFactory;
 import com.firefly.common.webhooks.core.domain.events.WebhookReceivedEvent;
 import com.firefly.common.webhooks.core.mappers.WebhookEventMapper;
+import com.firefly.common.webhooks.core.services.WebhookBatchingService;
+import com.firefly.common.webhooks.core.services.WebhookCompressionService;
 import com.firefly.common.webhooks.core.services.WebhookProcessingService;
 import com.firefly.common.webhooks.interfaces.dto.WebhookEventDTO;
 import com.firefly.common.webhooks.interfaces.dto.WebhookResponseDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
+import reactor.util.context.ContextView;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -47,6 +52,12 @@ public class WebhookProcessingServiceImpl implements WebhookProcessingService {
     private final EventPublisherFactory eventPublisherFactory;
     private final WebhookEventMapper webhookEventMapper;
 
+    @Autowired(required = false)
+    private WebhookBatchingService batchingService;
+
+    @Autowired(required = false)
+    private WebhookCompressionService compressionService;
+
     @Value("${firefly.webhooks.destination.prefix:}")
     private String destinationPrefix;
 
@@ -59,12 +70,29 @@ public class WebhookProcessingServiceImpl implements WebhookProcessingService {
     @Value("${firefly.webhooks.destination.custom:}")
     private String customDestination;
 
+    @Value("${firefly.webhooks.batching.enabled:false}")
+    private boolean batchingEnabled;
+
+    @Value("${firefly.webhooks.compression.enabled:false}")
+    private boolean compressionEnabled;
+
     @Override
     public Mono<WebhookResponseDTO> processWebhook(WebhookEventDTO eventDto) {
         log.info("Processing webhook from provider: {}", eventDto.getProviderName());
 
         // Convert DTO to domain event
         WebhookReceivedEvent domainEvent = webhookEventMapper.toDomainEvent(eventDto);
+
+        // Apply compression if enabled
+        if (compressionEnabled && compressionService != null) {
+            byte[] compressed = compressionService.compress(domainEvent.getPayload());
+            if (compressed != null) {
+                domainEvent.setCompressedPayload(compressed);
+                domainEvent.setCompressed(true);
+                domainEvent.setPayload(null); // Clear original payload to save memory
+                log.debug("Payload compressed for event: {}", domainEvent.getEventId());
+            }
+        }
 
         // Resolve destination for metadata
         String destination = resolveDestination(eventDto.getProviderName());
@@ -148,26 +176,83 @@ public class WebhookProcessingServiceImpl implements WebhookProcessingService {
         // Resolve destination based on configuration
         String destination = resolveDestination(event.getProviderName());
 
-        // Build headers with metadata
-        Map<String, Object> headers = new HashMap<>();
-        headers.put("provider", event.getProviderName());
-        headers.put("eventId", event.getEventId().toString());
-        headers.put("receivedAt", event.getReceivedAt().toString());
+        return Mono.deferContextual(ctx -> {
+            // Build headers with metadata
+            Map<String, Object> headers = new HashMap<>();
+            headers.put("provider", event.getProviderName());
+            headers.put("eventId", event.getEventId().toString());
+            headers.put("receivedAt", event.getReceivedAt().toString());
 
-        log.debug("Publishing webhook event to destination: {}", destination);
+            // Propagate distributed tracing context to Kafka headers
+            // This allows end-to-end tracing from HTTP request -> Kafka -> Worker
+            addTracingHeaders(headers, ctx);
 
-        // Get default publisher from factory
-        EventPublisher publisher = eventPublisherFactory.getDefaultPublisher();
-        
-        if (publisher == null) {
-            log.error("No event publisher available");
-            return Mono.error(new IllegalStateException("No event publisher available"));
+            log.debug("Publishing webhook event to destination: {} with tracing headers", destination);
+
+            // Use batching if enabled, otherwise publish directly
+            if (batchingEnabled && batchingService != null) {
+                log.debug("Adding event {} to batch for destination: {}", event.getEventId(), destination);
+                return batchingService.addToBatch(event, destination, headers)
+                        .doOnSuccess(v -> log.debug("Event {} added to batch successfully", event.getEventId()))
+                        .doOnError(error -> log.error("Error adding event {} to batch", event.getEventId(), error));
+            }
+
+            // Direct publishing (original behavior)
+            EventPublisher publisher = eventPublisherFactory.getDefaultPublisher();
+
+            if (publisher == null) {
+                log.error("No event publisher available");
+                return Mono.error(new IllegalStateException("No event publisher available"));
+            }
+
+            // Publish the event AS-IS to the message queue
+            return publisher.publish(event, destination, headers)
+                    .doOnSuccess(v -> log.debug("Successfully published webhook event: {} with trace context",
+                            event.getEventId()))
+                    .doOnError(error -> log.error("Error publishing webhook event: {}",
+                            event.getEventId(), error));
+        });
+    }
+
+    /**
+     * Adds distributed tracing headers to Kafka message headers.
+     * <p>
+     * Propagates B3 trace context (traceId, spanId) from the reactive context
+     * to Kafka headers so that downstream consumers can continue the trace.
+     *
+     * @param headers the Kafka message headers
+     * @param ctx the reactive context view
+     */
+    private void addTracingHeaders(Map<String, Object> headers, ContextView ctx) {
+        // Try to get trace context from reactive context first
+        String traceId = ctx.getOrDefault("traceId", null);
+        String spanId = ctx.getOrDefault("spanId", null);
+        String requestId = ctx.getOrDefault("requestId", null);
+
+        // Fallback to MDC if not in reactive context
+        if (traceId == null) {
+            traceId = MDC.get("traceId");
+        }
+        if (spanId == null) {
+            spanId = MDC.get("spanId");
+        }
+        if (requestId == null) {
+            requestId = MDC.get("requestId");
         }
 
-        // Publish the event AS-IS to the message queue
-        return publisher.publish(event, destination, headers)
-                .doOnSuccess(v -> log.debug("Successfully published webhook event: {}", event.getEventId()))
-                .doOnError(error -> log.error("Error publishing webhook event: {}", event.getEventId(), error));
+        // Add B3 propagation headers to Kafka message
+        if (traceId != null) {
+            headers.put("X-B3-TraceId", traceId);
+            log.debug("Propagating traceId to Kafka: {}", traceId);
+        }
+        if (spanId != null) {
+            headers.put("X-B3-SpanId", spanId);
+            log.debug("Propagating spanId to Kafka: {}", spanId);
+        }
+        if (requestId != null) {
+            headers.put("X-Request-ID", requestId);
+            log.debug("Propagating requestId to Kafka: {}", requestId);
+        }
     }
 
     /**
