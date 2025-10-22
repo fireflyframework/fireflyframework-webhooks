@@ -150,20 +150,6 @@ firefly:
             batch.size: 16384
             buffer.memory: 33554432
 
-    # Consumer Configuration
-    consumer:
-      enabled: true
-      group-id: ${FIREFLY_CONSUMER_GROUP_ID:webhook-worker-test}
-      kafka:
-        default:
-          enabled: true
-          bootstrap-servers: ${FIREFLY_KAFKA_BOOTSTRAP_SERVERS}
-          auto-offset-reset: earliest
-          properties:
-            enable.auto.commit: true
-            auto.commit.interval.ms: 1000
-            metadata.max.age.ms: 1000
-
 # OpenAPI / Swagger Configuration
 springdoc:
   api-docs:
