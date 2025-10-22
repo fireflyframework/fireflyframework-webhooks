@@ -69,11 +69,11 @@ firefly:
       # Prefix to add before the provider name (optional)
       # Example: "webhooks." results in "webhooks.stripe"
       prefix: ""
-      
+
       # Suffix to add after the provider name (optional)
       # Example: ".received" results in "stripe.received"
       suffix: ""
-      
+
       # Whether to use provider name as the topic/queue name (default: true)
       # When true: topic = {prefix}{provider-name}{suffix}
       # When false: topic = {prefix}{suffix}
@@ -82,7 +82,7 @@ firefly:
       #   - With prefix "webhooks.": "webhooks.stripe", "webhooks.paypal"
       #   - With prefix and suffix "webhooks." + ".received": "webhooks.stripe.received"
       use-provider-as-topic: true
-      
+
       # Custom destination (overrides all other settings)
       # If set, all webhooks go to this single destination regardless of provider
       # Example: "webhooks.all" - all providers publish to the same topic
