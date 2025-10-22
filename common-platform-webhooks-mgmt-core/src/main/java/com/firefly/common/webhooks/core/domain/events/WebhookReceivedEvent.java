@@ -17,6 +17,7 @@
 package com.firefly.common.webhooks.core.domain.events;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.firefly.common.webhooks.core.domain.WebhookMetadata;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -77,6 +78,22 @@ public class WebhookReceivedEvent {
      * HTTP method used for the webhook request
      */
     private String httpMethod;
+
+    /**
+     * Compressed payload (if compression is enabled)
+     */
+    private byte[] compressedPayload;
+
+    /**
+     * Indicates if the payload is compressed
+     */
+    @Builder.Default
+    private boolean compressed = false;
+
+    /**
+     * Enriched metadata (geolocation, User-Agent, etc.)
+     */
+    private WebhookMetadata enrichedMetadata;
 
     /**
      * Event type identifier for messaging
