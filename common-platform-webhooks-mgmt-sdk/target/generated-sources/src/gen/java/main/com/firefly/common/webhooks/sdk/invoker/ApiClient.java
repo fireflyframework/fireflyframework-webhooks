@@ -69,7 +69,7 @@ import com.firefly.common.webhooks.sdk.invoker.auth.HttpBasicAuth;
 import com.firefly.common.webhooks.sdk.invoker.auth.HttpBearerAuth;
 import com.firefly.common.webhooks.sdk.invoker.auth.ApiKeyAuth;
 
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2025-10-22T12:59:41.350272+02:00[Europe/Madrid]")
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2025-10-22T13:18:55.486073+02:00[Europe/Madrid]")
 public class ApiClient extends JavaTimeFormatter {
     public enum CollectionFormat {
         CSV(","), TSV("\t"), SSV(" "), PIPES("|"), MULTI(null);

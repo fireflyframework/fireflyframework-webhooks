@@ -19,6 +19,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.Assert;
 import org.junit.Ignore;
@@ -63,6 +65,14 @@ public class WebhookResponseDTOTest {
     }
 
     /**
+     * Test the property 'receivedAt'
+     */
+    @Test
+    public void receivedAtTest() {
+        // TODO: test receivedAt
+    }
+
+    /**
      * Test the property 'processedAt'
      */
     @Test
@@ -76,6 +86,22 @@ public class WebhookResponseDTOTest {
     @Test
     public void providerNameTest() {
         // TODO: test providerName
+    }
+
+    /**
+     * Test the property 'receivedPayload'
+     */
+    @Test
+    public void receivedPayloadTest() {
+        // TODO: test receivedPayload
+    }
+
+    /**
+     * Test the property 'metadata'
+     */
+    @Test
+    public void metadataTest() {
+        // TODO: test metadata
     }
 
 }

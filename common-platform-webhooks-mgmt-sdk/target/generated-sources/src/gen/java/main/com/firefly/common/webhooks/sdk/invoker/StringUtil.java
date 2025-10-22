@@ -16,7 +16,7 @@ package com.firefly.common.webhooks.sdk.invoker;
 import java.util.Collection;
 import java.util.Iterator;
 
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2025-10-22T12:59:41.350272+02:00[Europe/Madrid]")
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2025-10-22T13:18:55.486073+02:00[Europe/Madrid]")
 public class StringUtil {
   /**
    * Check if the given array contains the given value (with case-insensitive comparison).

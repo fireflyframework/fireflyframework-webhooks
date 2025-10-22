@@ -111,14 +111,18 @@ paths:
 components:
   schemas:
     JsonNode:
-      description: Raw webhook payload
+      description: Echo of the received payload for verification purposes
       type: object
     WebhookResponseDTO:
       description: Response after webhook event is received
       example:
         eventId: 123e4567-e89b-12d3-a456-426614174000
+        metadata:
+          key: "{}"
+        receivedPayload: "{}"
         processedAt: 2000-01-23T04:56:07.000+00:00
         message: Webhook received and queued for processing
+        receivedAt: 2000-01-23T04:56:07.000+00:00
         providerName: stripe
         status: ACCEPTED
       properties:
@@ -129,19 +133,36 @@ components:
           type: string
         status:
           description: Status of the webhook processing
+          enum:
+          - ACCEPTED
+          - ERROR
+          - REJECTED
           example: ACCEPTED
           type: string
         message:
           description: Message describing the result
           example: Webhook received and queued for processing
           type: string
+        receivedAt:
+          description: Timestamp when the webhook was received by the platform
+          format: date-time
+          type: string
         processedAt:
-          description: Timestamp when the webhook was processed
+          description: Timestamp when the webhook was processed and acknowledged
           format: date-time
           type: string
         providerName:
           description: Provider name for reference
           example: stripe
           type: string
+        receivedPayload:
+          description: Echo of the received payload for verification purposes
+          type: object
+        metadata:
+          additionalProperties:
+            description: Metadata about the webhook processing
+            type: object
+          description: Metadata about the webhook processing
+          type: object
       type: object
 

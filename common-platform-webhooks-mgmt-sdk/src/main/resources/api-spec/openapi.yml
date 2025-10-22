@@ -103,7 +103,7 @@ components:
   schemas:
     JsonNode:
       type: object
-      description: Raw webhook payload
+      description: Echo of the received payload for verification purposes
     WebhookResponseDTO:
       type: object
       properties:
@@ -116,16 +116,32 @@ components:
           type: string
           description: Status of the webhook processing
           example: ACCEPTED
+          enum:
+            - ACCEPTED
+            - ERROR
+            - REJECTED
         message:
           type: string
           description: Message describing the result
           example: Webhook received and queued for processing
+        receivedAt:
+          type: string
+          description: Timestamp when the webhook was received by the platform
+          format: date-time
         processedAt:
           type: string
-          description: Timestamp when the webhook was processed
+          description: Timestamp when the webhook was processed and acknowledged
           format: date-time
         providerName:
           type: string
           description: Provider name for reference
           example: stripe
+        receivedPayload:
+          $ref: '#/components/schemas/JsonNode'
+        metadata:
+          type: object
+          additionalProperties:
+            type: object
+            description: Metadata about the webhook processing
+          description: Metadata about the webhook processing
       description: Response after webhook event is received

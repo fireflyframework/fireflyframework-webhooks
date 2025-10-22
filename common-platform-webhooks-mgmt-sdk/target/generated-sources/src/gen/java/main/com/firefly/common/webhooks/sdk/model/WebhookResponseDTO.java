@@ -21,6 +21,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
@@ -32,25 +34,74 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
   WebhookResponseDTO.JSON_PROPERTY_EVENT_ID,
   WebhookResponseDTO.JSON_PROPERTY_STATUS,
   WebhookResponseDTO.JSON_PROPERTY_MESSAGE,
+  WebhookResponseDTO.JSON_PROPERTY_RECEIVED_AT,
   WebhookResponseDTO.JSON_PROPERTY_PROCESSED_AT,
-  WebhookResponseDTO.JSON_PROPERTY_PROVIDER_NAME
+  WebhookResponseDTO.JSON_PROPERTY_PROVIDER_NAME,
+  WebhookResponseDTO.JSON_PROPERTY_RECEIVED_PAYLOAD,
+  WebhookResponseDTO.JSON_PROPERTY_METADATA
 })
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2025-10-22T12:59:41.350272+02:00[Europe/Madrid]")
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2025-10-22T13:18:55.486073+02:00[Europe/Madrid]")
 public class WebhookResponseDTO {
   public static final String JSON_PROPERTY_EVENT_ID = "eventId";
   private UUID eventId;
 
+  /**
+   * Status of the webhook processing
+   */
+  public enum StatusEnum {
+    ACCEPTED("ACCEPTED"),
+    
+    ERROR("ERROR"),
+    
+    REJECTED("REJECTED");
+
+    private String value;
+
+    StatusEnum(String value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
+
+    @Override
+    public String toString() {
+      return String.valueOf(value);
+    }
+
+    @JsonCreator
+    public static StatusEnum fromValue(String value) {
+      for (StatusEnum b : StatusEnum.values()) {
+        if (b.value.equals(value)) {
+          return b;
+        }
+      }
+      throw new IllegalArgumentException("Unexpected value '" + value + "'");
+    }
+  }
+
   public static final String JSON_PROPERTY_STATUS = "status";
-  private String status;
+  private StatusEnum status;
 
   public static final String JSON_PROPERTY_MESSAGE = "message";
   private String message;
+
+  public static final String JSON_PROPERTY_RECEIVED_AT = "receivedAt";
+  private LocalDateTime receivedAt;
 
   public static final String JSON_PROPERTY_PROCESSED_AT = "processedAt";
   private LocalDateTime processedAt;
 
   public static final String JSON_PROPERTY_PROVIDER_NAME = "providerName";
   private String providerName;
+
+  public static final String JSON_PROPERTY_RECEIVED_PAYLOAD = "receivedPayload";
+  private Object receivedPayload;
+
+  public static final String JSON_PROPERTY_METADATA = "metadata";
+  private Map<String, Object> metadata = new HashMap<>();
 
   public WebhookResponseDTO() {
   }
@@ -81,7 +132,7 @@ public class WebhookResponseDTO {
   }
 
 
-  public WebhookResponseDTO status(String status) {
+  public WebhookResponseDTO status(StatusEnum status) {
     
     this.status = status;
     return this;
@@ -95,14 +146,14 @@ public class WebhookResponseDTO {
   @JsonProperty(JSON_PROPERTY_STATUS)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  public String getStatus() {
+  public StatusEnum getStatus() {
     return status;
   }
 
 
   @JsonProperty(JSON_PROPERTY_STATUS)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setStatus(String status) {
+  public void setStatus(StatusEnum status) {
     this.status = status;
   }
 
@@ -133,6 +184,32 @@ public class WebhookResponseDTO {
   }
 
 
+  public WebhookResponseDTO receivedAt(LocalDateTime receivedAt) {
+    
+    this.receivedAt = receivedAt;
+    return this;
+  }
+
+   /**
+   * Timestamp when the webhook was received by the platform
+   * @return receivedAt
+  **/
+  @javax.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_RECEIVED_AT)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public LocalDateTime getReceivedAt() {
+    return receivedAt;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_RECEIVED_AT)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setReceivedAt(LocalDateTime receivedAt) {
+    this.receivedAt = receivedAt;
+  }
+
+
   public WebhookResponseDTO processedAt(LocalDateTime processedAt) {
     
     this.processedAt = processedAt;
@@ -140,7 +217,7 @@ public class WebhookResponseDTO {
   }
 
    /**
-   * Timestamp when the webhook was processed
+   * Timestamp when the webhook was processed and acknowledged
    * @return processedAt
   **/
   @javax.annotation.Nullable
@@ -184,6 +261,66 @@ public class WebhookResponseDTO {
     this.providerName = providerName;
   }
 
+
+  public WebhookResponseDTO receivedPayload(Object receivedPayload) {
+    
+    this.receivedPayload = receivedPayload;
+    return this;
+  }
+
+   /**
+   * Echo of the received payload for verification purposes
+   * @return receivedPayload
+  **/
+  @javax.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_RECEIVED_PAYLOAD)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Object getReceivedPayload() {
+    return receivedPayload;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_RECEIVED_PAYLOAD)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setReceivedPayload(Object receivedPayload) {
+    this.receivedPayload = receivedPayload;
+  }
+
+
+  public WebhookResponseDTO metadata(Map<String, Object> metadata) {
+    
+    this.metadata = metadata;
+    return this;
+  }
+
+  public WebhookResponseDTO putMetadataItem(String key, Object metadataItem) {
+    if (this.metadata == null) {
+      this.metadata = new HashMap<>();
+    }
+    this.metadata.put(key, metadataItem);
+    return this;
+  }
+
+   /**
+   * Metadata about the webhook processing
+   * @return metadata
+  **/
+  @javax.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Map<String, Object> getMetadata() {
+    return metadata;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setMetadata(Map<String, Object> metadata) {
+    this.metadata = metadata;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -196,13 +333,16 @@ public class WebhookResponseDTO {
     return Objects.equals(this.eventId, webhookResponseDTO.eventId) &&
         Objects.equals(this.status, webhookResponseDTO.status) &&
         Objects.equals(this.message, webhookResponseDTO.message) &&
+        Objects.equals(this.receivedAt, webhookResponseDTO.receivedAt) &&
         Objects.equals(this.processedAt, webhookResponseDTO.processedAt) &&
-        Objects.equals(this.providerName, webhookResponseDTO.providerName);
+        Objects.equals(this.providerName, webhookResponseDTO.providerName) &&
+        Objects.equals(this.receivedPayload, webhookResponseDTO.receivedPayload) &&
+        Objects.equals(this.metadata, webhookResponseDTO.metadata);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(eventId, status, message, processedAt, providerName);
+    return Objects.hash(eventId, status, message, receivedAt, processedAt, providerName, receivedPayload, metadata);
   }
 
   @Override
@@ -212,8 +352,11 @@ public class WebhookResponseDTO {
     sb.append("    eventId: ").append(toIndentedString(eventId)).append("\n");
     sb.append("    status: ").append(toIndentedString(status)).append("\n");
     sb.append("    message: ").append(toIndentedString(message)).append("\n");
+    sb.append("    receivedAt: ").append(toIndentedString(receivedAt)).append("\n");
     sb.append("    processedAt: ").append(toIndentedString(processedAt)).append("\n");
     sb.append("    providerName: ").append(toIndentedString(providerName)).append("\n");
+    sb.append("    receivedPayload: ").append(toIndentedString(receivedPayload)).append("\n");
+    sb.append("    metadata: ").append(toIndentedString(metadata)).append("\n");
     sb.append("}");
     return sb.toString();
   }

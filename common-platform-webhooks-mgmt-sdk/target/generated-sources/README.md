@@ -4,7 +4,7 @@ Firefly Webhook Management Platform
 
 - API version: 1.0.0
 
-- Build date: 2025-10-22T12:59:41.350272+02:00[Europe/Madrid]
+- Build date: 2025-10-22T13:18:55.486073+02:00[Europe/Madrid]
 
 Unified webhook ingestion platform for multiple providers with message queue integration
 

@@ -10,6 +10,7 @@ com/firefly/common/webhooks/sdk/api/HealthCheckApi.class
 com/firefly/common/webhooks/sdk/invoker/StringUtil.class
 com/firefly/common/webhooks/sdk/api/HealthCheckApi$8.class
 com/firefly/common/webhooks/sdk/invoker/RFC3339DateFormat.class
+com/firefly/common/webhooks/sdk/model/WebhookResponseDTO$StatusEnum.class
 com/firefly/common/webhooks/sdk/api/HealthCheckApi$3.class
 com/firefly/common/webhooks/sdk/invoker/auth/ApiKeyAuth.class
 com/firefly/common/webhooks/sdk/model/WebhookResponseDTO.class
