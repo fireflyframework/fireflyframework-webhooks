@@ -63,4 +63,7 @@ public class WebhookEventDTO {
 
     @Schema(description = "HTTP method used for the webhook request", example = "POST")
     private String httpMethod;
+
+    @Schema(description = "Enriched metadata (geolocation, User-Agent, etc.)")
+    private Map<String, Object> enrichedMetadata;
 }
