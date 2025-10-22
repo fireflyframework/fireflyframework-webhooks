@@ -12,8 +12,7 @@ servers:
   - url: https://webhooks.getfirefly.io
     description: Production Environment
 tags:
-  - name: Health Check
-    description: Endpoints for testing service connectivity
+
   - name: Webhooks
     description: Webhook ingestion endpoints for multiple providers
 paths:
@@ -57,48 +56,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WebhookResponseDTO'
-  /api/v1/health/test-kafka:
-    post:
-      tags:
-        - Health Check
-      summary: Test Kafka connectivity
-      description: Sends a test message to Kafka to verify connectivity
-      operationId: testKafka
-      responses:
-        '200':
-          description: OK
-          content:
-            '*/*':
-              schema:
-                type: object
-  /api/v1/health/test-cache:
-    post:
-      tags:
-        - Health Check
-      summary: Test cache connectivity
-      description: Tests cache read/write operations
-      operationId: testCache
-      responses:
-        '200':
-          description: OK
-          content:
-            '*/*':
-              schema:
-                type: object
-  /api/v1/health/status:
-    get:
-      tags:
-        - Health Check
-      summary: Get service status
-      description: Returns the status of all connected services
-      operationId: getStatus
-      responses:
-        '200':
-          description: OK
-          content:
-            '*/*':
-              schema:
-                type: object
 components:
   schemas:
     JsonNode:
