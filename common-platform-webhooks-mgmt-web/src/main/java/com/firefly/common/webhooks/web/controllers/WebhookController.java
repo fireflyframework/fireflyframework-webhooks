@@ -20,6 +20,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.firefly.common.webhooks.core.services.WebhookProcessingService;
 import com.firefly.common.webhooks.interfaces.dto.WebhookEventDTO;
 import com.firefly.common.webhooks.interfaces.dto.WebhookResponseDTO;
+import com.firefly.common.webhooks.core.idempotency.HttpIdempotencyService;
+import com.firefly.common.webhooks.core.metrics.WebhookMetricsService;
+import com.firefly.common.webhooks.core.validation.WebhookValidator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -28,6 +31,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -39,6 +43,7 @@ import reactor.core.publisher.Mono;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -65,6 +70,10 @@ import java.util.UUID;
 public class WebhookController {
 
     private final WebhookProcessingService webhookProcessingService;
+    private final WebhookValidator webhookValidator;
+    private final HttpIdempotencyService httpIdempotencyService;
+    private final WebhookMetricsService metricsService;
+    private final com.firefly.common.webhooks.core.ratelimit.WebhookRateLimitService rateLimitService;
 
     /**
      * Universal webhook endpoint that accepts webhooks from any provider.
@@ -117,33 +126,114 @@ public class WebhookController {
             @Parameter(description = "Raw webhook payload", required = true)
             @RequestBody JsonNode payload,
             ServerHttpRequest request,
-            @RequestParam(required = false) MultiValueMap<String, String> queryParams
+            @RequestParam(required = false) MultiValueMap<String, String> queryParams,
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey
     ) {
+        Instant startTime = Instant.now();
+        UUID eventId = UUID.randomUUID();
+
+        // Set MDC for structured logging
+        MDC.put("eventId", eventId.toString());
+        MDC.put("provider", providerName);
+
         log.info("Received webhook from provider: {}", providerName);
 
+        // Record metrics
+        metricsService.recordWebhookReceived(providerName);
+
+        // Apply rate limiting
+        String sourceIp = extractSourceIp(request);
+
+        return rateLimitService.executeWithRateLimit(providerName,
+                rateLimitService.executeWithIpRateLimit(sourceIp,
+                        Mono.defer(() -> {
+                            try {
+                                // 1. Validate request
+                                webhookValidator.validateRequest(providerName, payload, request);
+
+                                // 2. Check HTTP-level idempotency
+                                String extractedIdempotencyKey = httpIdempotencyService.extractIdempotencyKey(idempotencyKey);
+                                if (extractedIdempotencyKey != null) {
+                                    return httpIdempotencyService.getCachedResponse(extractedIdempotencyKey)
+                                            .flatMap(cachedResponse -> {
+                                                if (cachedResponse.isPresent()) {
+                                                    log.info("Returning cached response for idempotency key: {}", extractedIdempotencyKey);
+                                                    metricsService.recordDuplicateWebhook(providerName);
+                                                    return Mono.just(cachedResponse.get());
+                                                }
+                                                return processNewWebhook(providerName, payload, request, queryParams,
+                                                        eventId, startTime, extractedIdempotencyKey);
+                                            });
+                                }
+
+                                return processNewWebhook(providerName, payload, request, queryParams,
+                                        eventId, startTime, null);
+
+                            } catch (ResponseStatusException e) {
+                                // Validation failed
+                                metricsService.recordWebhookRejected(providerName, e.getReason());
+                                return Mono.error(e);
+                            }
+                        })
+                )
+        )
+        .doFinally(signal -> {
+            MDC.remove("eventId");
+            MDC.remove("provider");
+        });
+    }
+
+    /**
+     * Processes a new webhook (not cached).
+     */
+    private Mono<WebhookResponseDTO> processNewWebhook(
+            String providerName,
+            JsonNode payload,
+            ServerHttpRequest request,
+            MultiValueMap<String, String> queryParams,
+            UUID eventId,
+            Instant startTime,
+            String idempotencyKey) {
+
         // Extract headers - these will be stored in event store and passed to workers
-        // Workers will validate signatures when processing events from the queue
         Map<String, String> headers = extractHeaders(request);
+
+        // Record payload size
+        long payloadSize = payload.toString().getBytes().length;
+        metricsService.recordPayloadSize(providerName, payloadSize);
 
         // Build webhook event DTO
         WebhookEventDTO eventDto = WebhookEventDTO.builder()
-                .eventId(UUID.randomUUID())
+                .eventId(eventId)
                 .providerName(providerName.toLowerCase())
                 .payload(payload)
                 .headers(headers)
                 .queryParams(extractQueryParams(queryParams))
-                .receivedAt(Instant.now())
+                .receivedAt(startTime)
                 .sourceIp(extractSourceIp(request))
                 .httpMethod(request.getMethod().name())
                 .build();
 
         // Process the webhook
         return webhookProcessingService.processWebhook(eventDto)
-                .doOnSuccess(response ->
-                        log.info("Webhook processed successfully: {} from provider: {}",
-                                response.getEventId(), providerName))
-                .doOnError(error ->
-                        log.error("Error processing webhook from provider: {}", providerName, error));
+                .flatMap(response -> {
+                    // Cache response if idempotency key provided
+                    if (idempotencyKey != null) {
+                        return httpIdempotencyService.cacheResponse(idempotencyKey, response)
+                                .thenReturn(response);
+                    }
+                    return Mono.just(response);
+                })
+                .doOnSuccess(response -> {
+                    log.info("Webhook processed successfully: {} from provider: {}", eventId, providerName);
+                    metricsService.recordWebhookPublished(providerName);
+                    metricsService.recordProcessingTime(providerName, startTime);
+                })
+                .doOnError(error -> {
+                    log.error("Error processing webhook from provider: {}", providerName, error);
+                    String errorType = error.getClass().getSimpleName();
+                    metricsService.recordWebhookFailed(providerName, errorType);
+                });
     }
 
     /**
