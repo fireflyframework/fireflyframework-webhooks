@@ -12,7 +12,6 @@ servers:
   - url: https://webhooks.getfirefly.io
     description: Production Environment
 tags:
-
   - name: Webhooks
     description: Webhook ingestion endpoints for multiple providers
 paths:
@@ -31,6 +30,11 @@ paths:
           schema:
             type: string
           example: stripe
+        - name: X-Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
       requestBody:
         content:
           application/json:
