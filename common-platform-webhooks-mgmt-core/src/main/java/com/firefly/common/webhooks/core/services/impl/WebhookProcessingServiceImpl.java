@@ -110,10 +110,6 @@ public class WebhookProcessingServiceImpl implements WebhookProcessingService {
         metadata.put("sourceIp", eventDto.getSourceIp());
         metadata.put("httpMethod", eventDto.getHttpMethod());
 
-        if (eventDto.getCorrelationId() != null) {
-            metadata.put("correlationId", eventDto.getCorrelationId());
-        }
-
         // Add payload size information
         if (eventDto.getPayload() != null) {
             metadata.put("payloadSize", eventDto.getPayload().toString().length());
@@ -157,10 +153,6 @@ public class WebhookProcessingServiceImpl implements WebhookProcessingService {
         headers.put("provider", event.getProviderName());
         headers.put("eventId", event.getEventId().toString());
         headers.put("receivedAt", event.getReceivedAt().toString());
-        
-        if (event.getCorrelationId() != null) {
-            headers.put("correlationId", event.getCorrelationId());
-        }
 
         log.debug("Publishing webhook event to destination: {}", destination);
 

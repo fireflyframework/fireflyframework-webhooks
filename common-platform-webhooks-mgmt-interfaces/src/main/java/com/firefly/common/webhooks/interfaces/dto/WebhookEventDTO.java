@@ -58,9 +58,6 @@ public class WebhookEventDTO {
     @Schema(description = "Timestamp when the webhook was received")
     private Instant receivedAt;
 
-    @Schema(description = "Optional correlation ID for tracking")
-    private String correlationId;
-
     @Schema(description = "Client IP address that sent the webhook")
     private String sourceIp;
 

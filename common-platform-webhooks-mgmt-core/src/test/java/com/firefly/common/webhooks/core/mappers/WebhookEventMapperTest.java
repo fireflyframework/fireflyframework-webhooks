@@ -46,7 +46,6 @@ class WebhookEventMapperTest {
                 .headers(Map.of("stripe-signature", "sig123"))
                 .queryParams(Map.of("test", "true"))
                 .receivedAt(receivedAt)
-                .correlationId("corr-123")
                 .sourceIp("192.168.1.1")
                 .httpMethod("POST")
                 .build();
@@ -62,7 +61,6 @@ class WebhookEventMapperTest {
         assertThat(event.getHeaders()).containsEntry("stripe-signature", "sig123");
         assertThat(event.getQueryParams()).containsEntry("test", "true");
         assertThat(event.getReceivedAt()).isEqualTo(receivedAt);
-        assertThat(event.getCorrelationId()).isEqualTo("corr-123");
         assertThat(event.getSourceIp()).isEqualTo("192.168.1.1");
         assertThat(event.getHttpMethod()).isEqualTo("POST");
     }
@@ -82,7 +80,6 @@ class WebhookEventMapperTest {
                 .headers(Map.of("paypal-auth", "token"))
                 .queryParams(Map.of())
                 .receivedAt(receivedAt)
-                .correlationId("corr-456")
                 .sourceIp("10.0.0.1")
                 .httpMethod("POST")
                 .build();
@@ -97,7 +94,6 @@ class WebhookEventMapperTest {
         assertThat(dto.getPayload()).isEqualTo(payload);
         assertThat(dto.getHeaders()).containsEntry("paypal-auth", "token");
         assertThat(dto.getReceivedAt()).isEqualTo(receivedAt);
-        assertThat(dto.getCorrelationId()).isEqualTo("corr-456");
     }
 
     @Test
@@ -119,7 +115,6 @@ class WebhookEventMapperTest {
         // Then
         assertThat(event).isNotNull();
         assertThat(event.getProviderName()).isEqualTo("github");
-        assertThat(event.getCorrelationId()).isNull();
         assertThat(event.getSourceIp()).isNull();
     }
 }

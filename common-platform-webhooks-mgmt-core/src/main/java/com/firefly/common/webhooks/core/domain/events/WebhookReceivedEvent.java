@@ -69,11 +69,6 @@ public class WebhookReceivedEvent {
     private Instant receivedAt;
 
     /**
-     * Optional correlation ID for tracking
-     */
-    private String correlationId;
-
-    /**
      * Client IP address that sent the webhook
      */
     private String sourceIp;
