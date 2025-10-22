@@ -50,6 +50,7 @@ This platform follows a **producer-consumer pattern** where:
 - **AS-IS Preservation**: Stores complete webhook payload, headers, and metadata
 - **Reactive Processing**: Built on Spring WebFlux for high concurrency
 - **Idempotency Support**: HTTP-level idempotency using `X-Idempotency-Key` header
+- **Enhanced Response**: Rich acknowledgment response with payload echo, timestamps, and processing metadata for webhook sender verification
 
 ### Message Queue Integration
 - **Multi-Protocol Support**: Kafka (primary) and RabbitMQ via `lib-common-eda`
@@ -399,16 +400,50 @@ firefly:
 
 **Request Body**: Any valid JSON payload
 
-**Response**: `200 OK`
+**Response**: `202 ACCEPTED`
 ```json
 {
   "eventId": "123e4567-e89b-12d3-a456-426614174000",
   "status": "ACCEPTED",
   "message": "Webhook received and queued for processing",
-  "processedAt": "2025-10-22T10:00:00Z",
-  "providerName": "stripe"
+  "receivedAt": "2025-10-22T10:00:00.123Z",
+  "processedAt": "2025-10-22T10:00:00.456Z",
+  "providerName": "stripe",
+  "receivedPayload": {
+    "type": "payment_intent.succeeded",
+    "data": {
+      "object": {
+        "id": "pi_1234567890",
+        "amount": 2000,
+        "currency": "usd"
+      }
+    }
+  },
+  "metadata": {
+    "destination": "stripe",
+    "sourceIp": "192.168.1.100",
+    "httpMethod": "POST",
+    "payloadSize": 1024,
+    "headerCount": 15
+  }
 }
 ```
+
+**Response Fields**:
+- `eventId` - Unique identifier assigned to this webhook event
+- `status` - Processing status (`ACCEPTED`, `ERROR`, or `REJECTED`)
+- `message` - Human-readable description of the result
+- `receivedAt` - Timestamp when the webhook was received by the platform
+- `processedAt` - Timestamp when the webhook was acknowledged
+- `providerName` - Echo of the provider name from the URL
+- `receivedPayload` - Echo of the received payload for verification
+- `metadata` - Additional processing metadata:
+  - `destination` - Kafka topic/queue where the event was published
+  - `sourceIp` - IP address of the webhook sender
+  - `httpMethod` - HTTP method used (typically POST)
+  - `payloadSize` - Size of the payload in bytes
+  - `headerCount` - Number of HTTP headers received
+  - `correlationId` - Correlation ID if provided in headers
 
 ### cURL Examples
 
@@ -599,6 +634,49 @@ curl -X POST http://localhost:8080/api/v1/webhook/twilio \
 ```
 
 **Note**: The platform accepts both JSON and form-encoded payloads. All data is preserved as-is and published to Kafka.
+
+### Enhanced Response Benefits
+
+The webhook platform returns a comprehensive response that provides valuable information to webhook senders:
+
+#### 1. **Payload Verification**
+The `receivedPayload` field echoes back the exact payload received, allowing webhook senders to:
+- Verify the payload was received correctly
+- Debug payload formatting issues
+- Confirm data integrity
+- Audit webhook deliveries
+
+#### 2. **Event Tracking**
+Each webhook receives a unique `eventId` that can be used to:
+- Track the webhook through the entire processing pipeline
+- Correlate logs across distributed systems
+- Query event status and processing results
+- Support customer service inquiries
+
+#### 3. **Processing Metadata**
+The `metadata` object provides operational insights:
+- **destination**: Confirms which Kafka topic/queue received the event
+- **sourceIp**: Helps identify the webhook sender for security auditing
+- **payloadSize**: Useful for monitoring and capacity planning
+- **headerCount**: Validates that all expected headers were received
+- **correlationId**: Enables distributed tracing across microservices
+
+#### 4. **Timestamp Precision**
+Two timestamps provide detailed timing information:
+- **receivedAt**: When the platform received the webhook (useful for latency analysis)
+- **processedAt**: When the acknowledgment was sent (measures platform processing time)
+
+#### 5. **Status Clarity**
+The `status` field clearly indicates the outcome:
+- `ACCEPTED`: Webhook successfully queued for processing
+- `ERROR`: Platform encountered an error (with details in `message`)
+- `REJECTED`: Webhook was rejected (e.g., invalid format, rate limit exceeded)
+
+This enhanced response format is particularly valuable for:
+- **Debugging**: Webhook senders can verify their integration is working correctly
+- **Monitoring**: Operations teams can track webhook delivery success rates
+- **Compliance**: Audit trails for financial and regulated industries
+- **Support**: Customer service can quickly look up webhook events by ID
 
 ### Health Check Endpoints
 

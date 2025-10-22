@@ -247,12 +247,16 @@ The platform separates write operations (commands) from read operations (queries
 **Design Pattern**: Data Transfer Object (DTO)
 
 **Key Classes**:
-- `WebhookEventDTO`: Immutable DTO with all webhook data
-- `WebhookResponseDTO`: HTTP response DTO
+- `WebhookEventDTO`: Immutable DTO with all webhook data (eventId, providerName, payload, headers, etc.)
+- `WebhookResponseDTO`: Enhanced HTTP response DTO with:
+  - Event tracking (eventId, status, message)
+  - Timestamps (receivedAt, processedAt)
+  - Payload echo (receivedPayload)
+  - Processing metadata (destination, sourceIp, payloadSize, headerCount, correlationId)
 - `WebhookEventQueryDTO`: Query result DTO
 - `WebhookEventFilterDTO`: Filter criteria DTO
 
-**Dependencies**: None (pure POJOs)
+**Dependencies**: None (pure POJOs with Jackson annotations)
 
 **Design Decisions**:
 - Immutable objects for thread safety
@@ -362,7 +366,11 @@ The platform separates write operations (commands) from read operations (queries
    │           ├─> Set Kafka headers
    │           └─> Send to Kafka topic
    │
-   └─> Return 200 OK with WebhookResponseDTO
+   └─> Return 202 ACCEPTED with WebhookResponseDTO
+       - eventId, status, message
+       - receivedAt, processedAt timestamps
+       - receivedPayload (echo for verification)
+       - metadata (destination, sourceIp, payloadSize, etc.)
 ```
 
 ### Webhook Processing Flow
