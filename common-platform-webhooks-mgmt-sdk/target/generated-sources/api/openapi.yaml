@@ -1,0 +1,147 @@
+openapi: 3.0.1
+info:
+  contact:
+    email: platform@getfirefly.io
+    name: Firefly Platform Team
+  description: Unified webhook ingestion platform for multiple providers with message
+    queue integration
+  title: Firefly Webhook Management Platform
+  version: 1.0.0
+servers:
+- description: Local Development Environment
+  url: http://localhost:8080
+- description: Production Environment
+  url: https://webhooks.getfirefly.io
+tags:
+- description: Endpoints for testing service connectivity
+  name: Health Check
+- description: Webhook ingestion endpoints for multiple providers
+  name: Webhooks
+paths:
+  /api/v1/webhook/{providerName}:
+    post:
+      description: Universal endpoint that accepts webhooks from any provider. The
+        webhook payload is stored AS-IS and published to a message queue for processing.
+      operationId: receiveWebhook
+      parameters:
+      - description: Name of the webhook provider
+        example: stripe
+        explode: false
+        in: path
+        name: providerName
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JsonNode'
+        required: true
+      responses:
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookResponseDTO'
+          description: Webhook accepted and queued for processing
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookResponseDTO'
+          description: Invalid webhook payload
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookResponseDTO'
+          description: Internal server error
+      summary: Receive webhook from any provider
+      tags:
+      - Webhooks
+      x-content-type: application/json
+      x-accepts: application/json
+  /api/v1/health/test-kafka:
+    post:
+      description: Sends a test message to Kafka to verify connectivity
+      operationId: testKafka
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+          description: OK
+      summary: Test Kafka connectivity
+      tags:
+      - Health Check
+      x-accepts: '*/*'
+  /api/v1/health/test-cache:
+    post:
+      description: Tests cache read/write operations
+      operationId: testCache
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+          description: OK
+      summary: Test cache connectivity
+      tags:
+      - Health Check
+      x-accepts: '*/*'
+  /api/v1/health/status:
+    get:
+      description: Returns the status of all connected services
+      operationId: getStatus
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+          description: OK
+      summary: Get service status
+      tags:
+      - Health Check
+      x-accepts: '*/*'
+components:
+  schemas:
+    JsonNode:
+      description: Raw webhook payload
+      type: object
+    WebhookResponseDTO:
+      description: Response after webhook event is received
+      example:
+        eventId: 123e4567-e89b-12d3-a456-426614174000
+        processedAt: 2000-01-23T04:56:07.000+00:00
+        message: Webhook received and queued for processing
+        providerName: stripe
+        status: ACCEPTED
+      properties:
+        eventId:
+          description: Unique identifier for the processed webhook event
+          example: 123e4567-e89b-12d3-a456-426614174000
+          format: uuid
+          type: string
+        status:
+          description: Status of the webhook processing
+          example: ACCEPTED
+          type: string
+        message:
+          description: Message describing the result
+          example: Webhook received and queued for processing
+          type: string
+        processedAt:
+          description: Timestamp when the webhook was processed
+          format: date-time
+          type: string
+        providerName:
+          description: Provider name for reference
+          example: stripe
+          type: string
+      type: object
+
