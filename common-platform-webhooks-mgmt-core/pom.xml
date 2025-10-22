@@ -37,6 +37,11 @@
             <artifactId>lib-common-eda</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.firefly</groupId>
+            <artifactId>lib-common-cache</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <!-- Spring WebFlux -->
         <dependency>
@@ -61,6 +66,13 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <scope>provided</scope>
+        </dependency>
+
+        <!-- Apache Commons Net for CIDR matching -->
+        <dependency>
+            <groupId>commons-net</groupId>
+            <artifactId>commons-net</artifactId>
+            <version>3.11.1</version>
         </dependency>
 
         <!-- Testing -->
