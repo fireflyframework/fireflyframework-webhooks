@@ -16,6 +16,7 @@
 
 package com.firefly.common.webhooks.interfaces.dto;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,6 +24,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -40,17 +42,26 @@ public class WebhookResponseDTO {
     @Schema(description = "Unique identifier for the processed webhook event", example = "123e4567-e89b-12d3-a456-426614174000")
     private UUID eventId;
 
-    @Schema(description = "Status of the webhook processing", example = "ACCEPTED")
+    @Schema(description = "Status of the webhook processing", example = "ACCEPTED", allowableValues = {"ACCEPTED", "ERROR", "REJECTED"})
     private String status;
 
     @Schema(description = "Message describing the result", example = "Webhook received and queued for processing")
     private String message;
 
-    @Schema(description = "Timestamp when the webhook was processed")
+    @Schema(description = "Timestamp when the webhook was received by the platform")
+    private Instant receivedAt;
+
+    @Schema(description = "Timestamp when the webhook was processed and acknowledged")
     private Instant processedAt;
 
     @Schema(description = "Provider name for reference", example = "stripe")
     private String providerName;
+
+    @Schema(description = "Echo of the received payload for verification purposes")
+    private JsonNode receivedPayload;
+
+    @Schema(description = "Metadata about the webhook processing")
+    private Map<String, Object> metadata;
 
     /**
      * Creates a success response.
@@ -60,12 +71,42 @@ public class WebhookResponseDTO {
      * @return a success response
      */
     public static WebhookResponseDTO success(UUID eventId, String providerName) {
+        Instant now = Instant.now();
         return WebhookResponseDTO.builder()
                 .eventId(eventId)
                 .status("ACCEPTED")
                 .message("Webhook received and queued for processing")
+                .receivedAt(now)
+                .processedAt(now)
+                .providerName(providerName)
+                .build();
+    }
+
+    /**
+     * Creates a success response with full details.
+     *
+     * @param eventId the event ID
+     * @param providerName the provider name
+     * @param receivedAt when the webhook was received
+     * @param payload the received payload
+     * @param metadata additional metadata
+     * @return a success response with full details
+     */
+    public static WebhookResponseDTO success(
+            UUID eventId,
+            String providerName,
+            Instant receivedAt,
+            JsonNode payload,
+            Map<String, Object> metadata) {
+        return WebhookResponseDTO.builder()
+                .eventId(eventId)
+                .status("ACCEPTED")
+                .message("Webhook received and queued for processing")
+                .receivedAt(receivedAt)
                 .processedAt(Instant.now())
                 .providerName(providerName)
+                .receivedPayload(payload)
+                .metadata(metadata)
                 .build();
     }
 
@@ -78,12 +119,41 @@ public class WebhookResponseDTO {
      * @return an error response
      */
     public static WebhookResponseDTO error(UUID eventId, String providerName, String errorMessage) {
+        Instant now = Instant.now();
         return WebhookResponseDTO.builder()
                 .eventId(eventId)
                 .status("ERROR")
                 .message(errorMessage)
+                .receivedAt(now)
+                .processedAt(now)
+                .providerName(providerName)
+                .build();
+    }
+
+    /**
+     * Creates an error response with full details.
+     *
+     * @param eventId the event ID (may be null)
+     * @param providerName the provider name
+     * @param errorMessage the error message
+     * @param receivedAt when the webhook was received
+     * @param payload the received payload (if available)
+     * @return an error response with full details
+     */
+    public static WebhookResponseDTO error(
+            UUID eventId,
+            String providerName,
+            String errorMessage,
+            Instant receivedAt,
+            JsonNode payload) {
+        return WebhookResponseDTO.builder()
+                .eventId(eventId)
+                .status("ERROR")
+                .message(errorMessage)
+                .receivedAt(receivedAt)
                 .processedAt(Instant.now())
                 .providerName(providerName)
+                .receivedPayload(payload)
                 .build();
     }
 }
