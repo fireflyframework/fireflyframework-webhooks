@@ -247,7 +247,6 @@ common-platform-webhooks-mgmt/
 **Key Components**:
 - `WebhookManagementApplication` - Main Spring Boot application
 - `WebhookController` - REST controller for webhook ingestion
-- `HealthCheckController` - Health check endpoints for testing
 - `application.yml` - Configuration file
 
 **Dependencies**:
@@ -443,7 +442,6 @@ firefly:
   - `httpMethod` - HTTP method used (typically POST)
   - `payloadSize` - Size of the payload in bytes
   - `headerCount` - Number of HTTP headers received
-  - `correlationId` - Correlation ID if provided in headers
 
 ### cURL Examples
 
@@ -604,8 +602,7 @@ curl -X POST http://localhost:8080/api/v1/webhook/github \
     "sourceIp": "140.82.115.1",
     "httpMethod": "POST",
     "payloadSize": 412,
-    "headerCount": 5,
-    "correlationId": "12345678-1234-1234-1234-123456789012"
+    "headerCount": 5
   }
 }
 ```
@@ -795,7 +792,6 @@ The `metadata` object provides operational insights:
 - **sourceIp**: Helps identify the webhook sender for security auditing
 - **payloadSize**: Useful for monitoring and capacity planning
 - **headerCount**: Validates that all expected headers were received
-- **correlationId**: Enables distributed tracing across microservices
 
 #### 4. **Timestamp Precision**
 Two timestamps provide detailed timing information:
@@ -816,7 +812,8 @@ This enhanced response format is particularly valuable for:
 
 ### Health Check Endpoints
 
-#### Application Health
+Spring Boot Actuator provides comprehensive health checks at `/actuator/health`:
+
 ```bash
 GET /actuator/health
 ```
@@ -826,43 +823,41 @@ Response:
 {
   "status": "UP",
   "components": {
-    "kafka": {"status": "UP"},
-    "redis": {"status": "UP"},
-    "diskSpace": {"status": "UP"}
+    "kafka": {
+      "status": "UP",
+      "details": {
+        "clusterId": "kafka-cluster-1"
+      }
+    },
+    "redis": {
+      "status": "UP",
+      "details": {
+        "version": "7.0.0"
+      }
+    },
+    "diskSpace": { "status": "UP" },
+    "ping": { "status": "UP" }
   }
 }
 ```
 
-#### Service Status (Custom)
-```bash
-GET /api/v1/health/status
-```
+**Available Health Indicators**:
+- **Kafka**: Verifies Kafka broker connectivity
+- **Redis**: Verifies Redis connectivity (if enabled)
+- **Disk Space**: Monitors available disk space
+- **Ping**: Basic application liveness check
 
-Response:
-```json
-{
-  "timestamp": "2025-10-22T10:00:00Z",
-  "application": "common-platform-webhooks-mgmt",
-  "status": "UP",
-  "cache": {
-    "available": true,
-    "type": "Redis Distributed Cache (redis)",
-    "name": "webhook-idempotency"
-  },
-  "kafka": {
-    "configured": true
-  }
-}
-```
-
-#### Test Kafka Connection
-```bash
-POST /api/v1/health/test-kafka
-```
-
-#### Test Cache Connection
-```bash
-POST /api/v1/health/test-cache
+**Configuration**: Health check details are controlled in `application.yml`:
+```yaml
+management:
+  endpoint:
+    health:
+      show-details: always  # Shows detailed health information
+  health:
+    redis:
+      enabled: ${REDIS_HEALTH_ENABLED:true}
+    rabbit:
+      enabled: ${RABBITMQ_HEALTH_ENABLED:false}
 ```
 
 ### OpenAPI Documentation
@@ -898,7 +893,6 @@ Events published to Kafka/RabbitMQ have the following structure:
   },
   "queryParams": {},
   "receivedAt": "2025-10-22T10:00:00.123Z",
-  "correlationId": "corr-123",
   "sourceIp": "192.168.1.1",
   "httpMethod": "POST"
 }
@@ -910,7 +904,6 @@ The platform also sets Kafka message headers:
 - `provider` - Provider name (e.g., "stripe")
 - `eventId` - Unique event identifier
 - `receivedAt` - ISO-8601 timestamp
-- `correlationId` - Correlation ID for tracing (if provided)
 
 ## 🧪 Development
 
@@ -956,8 +949,7 @@ common-platform-webhooks-mgmt-web/
 │       ├── web/
 │       │   ├── WebhookManagementApplication.java    # Main application
 │       │   └── controllers/
-│       │       ├── WebhookController.java           # Webhook ingestion
-│       │       └── HealthCheckController.java       # Health checks
+│       │       └── WebhookController.java           # Webhook ingestion
 │       └── ...
 ├── src/main/resources/
 │   └── application.yml                              # Configuration
@@ -1105,7 +1097,6 @@ The application uses structured JSON logging with correlation IDs:
   "level": "INFO",
   "logger": "com.firefly.common.webhooks.web.controllers.WebhookController",
   "message": "Webhook received",
-  "correlationId": "corr-123",
   "eventId": "evt-456",
   "providerName": "stripe"
 }

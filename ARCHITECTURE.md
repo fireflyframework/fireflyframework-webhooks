@@ -252,7 +252,7 @@ The platform separates write operations (commands) from read operations (queries
   - Event tracking (eventId, status, message)
   - Timestamps (receivedAt, processedAt)
   - Payload echo (receivedPayload)
-  - Processing metadata (destination, sourceIp, payloadSize, headerCount, correlationId)
+  - Processing metadata (destination, sourceIp, payloadSize, headerCount)
 - `WebhookEventQueryDTO`: Query result DTO
 - `WebhookEventFilterDTO`: Filter criteria DTO
 
