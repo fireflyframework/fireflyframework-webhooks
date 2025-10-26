@@ -22,7 +22,6 @@ import com.firefly.common.webhooks.core.services.WebhookMetadataEnrichmentServic
 import com.firefly.common.webhooks.core.services.WebhookProcessingService;
 import com.firefly.common.webhooks.interfaces.dto.WebhookEventDTO;
 import com.firefly.common.webhooks.interfaces.dto.WebhookResponseDTO;
-import com.firefly.common.webhooks.core.idempotency.HttpIdempotencyService;
 import com.firefly.common.webhooks.core.metrics.WebhookMetricsService;
 import com.firefly.common.webhooks.core.validation.WebhookValidator;
 import io.swagger.v3.oas.annotations.Operation;
@@ -74,7 +73,6 @@ public class WebhookController {
 
     private final WebhookProcessingService webhookProcessingService;
     private final WebhookValidator webhookValidator;
-    private final HttpIdempotencyService httpIdempotencyService;
     private final WebhookMetricsService metricsService;
     private final com.firefly.common.webhooks.core.ratelimit.WebhookRateLimitService rateLimitService;
     private final WebhookMetadataEnrichmentService metadataEnrichmentService;
@@ -87,12 +85,17 @@ public class WebhookController {
      * - Any JSON payload in the request body
      * - All HTTP headers for signature validation
      * - Query parameters if needed
+     * - Optional X-Idempotency-Key header (handled by lib-common-web IdempotencyWebFilter)
      * <p>
      * Examples:
      * - POST /api/v1/webhook/stripe
      * - POST /api/v1/webhook/paypal
      * - POST /api/v1/webhook/twilio
      * - POST /api/v1/webhook/custom-provider
+     * <p>
+     * Note: HTTP-level idempotency is handled transparently by the IdempotencyWebFilter
+     * from lib-common-web. If a request includes an X-Idempotency-Key header, the filter
+     * will cache the entire HTTP response and return it for duplicate requests.
      *
      * @param providerName the name of the webhook provider
      * @param payload the raw webhook payload as JSON
@@ -129,8 +132,7 @@ public class WebhookController {
             @Parameter(description = "Raw webhook payload", required = true)
             @RequestBody JsonNode payload,
             ServerHttpRequest request,
-            @RequestParam(required = false) MultiValueMap<String, String> queryParams,
-            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey
+            @RequestParam(required = false) MultiValueMap<String, String> queryParams
     ) {
         Instant startTime = Instant.now();
         UUID eventId = UUID.randomUUID();
@@ -154,23 +156,10 @@ public class WebhookController {
                                 // 1. Validate request
                                 webhookValidator.validateRequest(providerName, payload, request);
 
-                                // 2. Check HTTP-level idempotency
-                                String extractedIdempotencyKey = httpIdempotencyService.extractIdempotencyKey(idempotencyKey);
-                                if (extractedIdempotencyKey != null) {
-                                    return httpIdempotencyService.getCachedResponse(extractedIdempotencyKey)
-                                            .flatMap(cachedResponse -> {
-                                                if (cachedResponse.isPresent()) {
-                                                    log.info("Returning cached response for idempotency key: {}", extractedIdempotencyKey);
-                                                    metricsService.recordDuplicateWebhook(providerName);
-                                                    return Mono.just(cachedResponse.get());
-                                                }
-                                                return processNewWebhook(providerName, payload, request, queryParams,
-                                                        eventId, startTime, extractedIdempotencyKey);
-                                            });
-                                }
-
-                                return processNewWebhook(providerName, payload, request, queryParams,
-                                        eventId, startTime, null);
+                                // 2. Process webhook
+                                // Note: HTTP-level idempotency is handled by IdempotencyWebFilter (lib-common-web)
+                                return processWebhook(providerName, payload, request, queryParams,
+                                        eventId, startTime);
 
                             } catch (ResponseStatusException e) {
                                 // Validation failed
@@ -188,16 +177,15 @@ public class WebhookController {
     }
 
     /**
-     * Processes a new webhook (not cached).
+     * Processes a webhook.
      */
-    private Mono<WebhookResponseDTO> processNewWebhook(
+    private Mono<WebhookResponseDTO> processWebhook(
             String providerName,
             JsonNode payload,
             ServerHttpRequest request,
             MultiValueMap<String, String> queryParams,
             UUID eventId,
-            Instant startTime,
-            String idempotencyKey) {
+            Instant startTime) {
 
         // Extract headers - these will be stored in event store and passed to workers
         Map<String, String> headers = extractHeaders(request);
@@ -227,19 +215,13 @@ public class WebhookController {
 
         // Process the webhook
         return webhookProcessingService.processWebhook(eventDto)
-                .flatMap(response -> {
+                .map(response -> {
                     // Calculate response time and add to metadata
                     long responseTimeMs = java.time.Duration.between(startTime, Instant.now()).toMillis();
                     if (response.getMetadata() != null) {
                         response.getMetadata().put("responseTimeMs", responseTimeMs);
                     }
-
-                    // Cache response if idempotency key provided
-                    if (idempotencyKey != null) {
-                        return httpIdempotencyService.cacheResponse(idempotencyKey, response)
-                                .thenReturn(response);
-                    }
-                    return Mono.just(response);
+                    return response;
                 })
                 .doOnSuccess(response -> {
                     log.info("Webhook processed successfully: {} from provider: {}", eventId, providerName);
