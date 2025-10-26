@@ -150,7 +150,7 @@ This platform follows a **producer-consumer pattern** where:
 
 ┌────────────────────────────────────────────────────────────────────────────────┐
 │                         Worker Application (Separate)                          │
-├────────────────────────────────────────────────────────────────────────────────┤
+├────────────────────────────────────────────────────────────────────────────────┤mvn
 │                                                                                │
 │  ┌──────────────────────┐      ┌─────────────────────┐                         │
 │  │ WebhookEventListener │─────>│  WebhookProcessor   │                         │
@@ -257,8 +257,8 @@ com.firefly.common.webhooks.core/
 │   └── TracingWebFilter.java           # Distributed tracing filter (B3 propagation, MDC)
 ├── health/                    # Health indicators
 │   └── WebhookCircuitBreakerHealthIndicator.java  # Circuit breaker health check
-├── idempotency/              # Idempotency services
-│   └── HttpIdempotencyService.java     # HTTP-level idempotency using X-Idempotency-Key
+├── idempotency/              # (Removed - now using lib-common-web)
+│   # HTTP-level idempotency moved to lib-common-web IdempotencyWebFilter
 ├── mappers/                   # MapStruct mappers
 │   └── WebhookEventMapper.java         # DTO ↔ Domain Event conversion
 ├── metrics/                   # Metrics services
@@ -279,7 +279,7 @@ com.firefly.common.webhooks.core/
 - **Resilience Patterns**: Circuit breaker, rate limiter, timeout, bulkhead (Resilience4j)
 - **Security**: Payload validation, rate limiting, IP whitelisting
 - **Observability**: Custom metrics, distributed tracing, health indicators
-- **Idempotency**: HTTP-level idempotency with Redis caching
+- **Idempotency**: Event-level idempotency (worker-level, see processor module)
 
 **Dependencies**:
 - `lib-common-eda` - Event publishing
@@ -353,7 +353,7 @@ com.firefly.common.webhooks.core/
 ### Firefly Libraries
 - **lib-common-eda** - Event-driven architecture (Kafka/RabbitMQ abstraction)
 - **lib-common-cache** - Distributed caching (Redis/Caffeine abstraction)
-- **lib-common-web** - Web utilities (logging, idempotency, error handling)
+- **lib-common-web** - Web utilities (**HTTP idempotency**, logging, error handling)
 - **lib-common-core** - Core utilities
 - **lib-common-cqrs** - CQRS framework (optional)
 
@@ -362,7 +362,7 @@ com.firefly.common.webhooks.core/
 - **RabbitMQ** - Alternative message broker (via lib-common-eda)
 
 ### Caching & Storage
-- **Redis 7+** - Distributed cache for idempotency and HTTP-level caching
+- **Redis 7+** - Distributed cache for event-level idempotency
 - **Caffeine** - In-memory cache (fallback)
 
 ### Resilience & Fault Tolerance
@@ -426,9 +426,10 @@ FIREFLY_WEBHOOKS_SECURITY_ENABLE_IP_WHITELIST=false             # Enable IP whit
 # IP whitelist per provider (JSON format) - supports exact IPs and CIDR notation:
 # FIREFLY_WEBHOOKS_SECURITY_IP_WHITELIST='{"stripe":["54.187.174.169","54.187.205.235"],"github":["192.30.252.0/22","185.199.108.0/22"]}'
 
-# HTTP Idempotency
-FIREFLY_WEBHOOKS_SECURITY_ENABLE_HTTP_IDEMPOTENCY=true          # Enable HTTP-level idempotency
-FIREFLY_WEBHOOKS_SECURITY_HTTP_IDEMPOTENCY_TTL_SECONDS=86400    # Idempotency cache TTL (default: 24h)
+# HTTP Idempotency (managed by lib-common-web)
+# Configure via idempotency.* properties instead:
+# IDEMPOTENCY_HEADER_NAME=X-Idempotency-Key
+# IDEMPOTENCY_CACHE_TTL_HOURS=24
 
 # Request Validation
 FIREFLY_WEBHOOKS_SECURITY_ENABLE_REQUEST_VALIDATION=true        # Enable request validation
@@ -693,9 +694,8 @@ firefly:
           - "173.0.82.0/24"       # CIDR notation
           - "64.4.240.0/21"       # CIDR notation
 
-      # HTTP-level idempotency
-      enable-http-idempotency: true
-      http-idempotency-ttl-seconds: 86400  # 24 hours
+      # HTTP-level idempotency removed - now handled by lib-common-web
+      # Configure via idempotency.* properties (see below)
 
       # Request validation
       enable-request-validation: true
@@ -721,7 +721,7 @@ firefly:
 
 **Request Headers**:
 - `Content-Type: application/json` (required)
-- `X-Idempotency-Key` (optional) - For HTTP-level idempotency
+- `X-Idempotency-Key` (optional) - For HTTP-level idempotency (handled by lib-common-web IdempotencyWebFilter)
 - Provider-specific headers (e.g., `Stripe-Signature`, `X-Hub-Signature-256`)
 
 **Request Body**: Any valid JSON payload
@@ -1013,8 +1013,10 @@ curl -X POST http://localhost:8080/api/v1/webhook/paypal \
   }'
 ```
 
-#### Example 7: Custom Provider with Idempotency
+#### Example 7: Custom Provider with HTTP Idempotency
 ```bash
+# The X-Idempotency-Key header is automatically handled by lib-common-web
+# If the same key is sent again, the cached response is returned immediately
 curl -X POST http://localhost:8080/api/v1/webhook/my-custom-provider \
   -H "Content-Type: application/json" \
   -H "X-Idempotency-Key: unique-request-id-12345" \
@@ -1308,7 +1310,7 @@ The project includes comprehensive integration tests using **Testcontainers**:
   1. HTTP POST to webhook endpoint
   2. Event published to Kafka
   3. Event consumed from Kafka
-  4. Idempotency check using Redis
+  4. Event-level idempotency check using Redis (worker-level)
   5. Signature validation
   6. Business logic processing
 

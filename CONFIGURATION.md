@@ -252,7 +252,9 @@ The destination is resolved in the following order:
 
 ## Cache Configuration
 
-The platform uses `lib-common-cache` for distributed caching and idempotency.
+The platform uses `lib-common-cache` for distributed caching and event-level idempotency.
+
+**Note**: HTTP-level idempotency (X-Idempotency-Key header) is now handled by `lib-common-web` and configured separately using `idempotency.*` properties. See [HTTP Idempotency Configuration](#http-idempotency-configuration) below.
 
 ### Cache Types
 
@@ -268,7 +270,7 @@ firefly:
     
     redis:
       enabled: true
-      cache-name: "webhook-idempotency"
+      cache-name: "default"
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       database: ${REDIS_DATABASE:0}
@@ -304,7 +306,7 @@ firefly:
     
     caffeine:
       enabled: true
-      cache-name: "webhook-idempotency"
+      cache-name: "default"
       key-prefix: "firefly:webhooks"
       maximum-size: 10000
       expire-after-write: 1h
@@ -333,6 +335,83 @@ firefly:
       enabled: true  # Fallback to Caffeine if Redis fails
       # Caffeine configuration...
 ```
+
+## HTTP Idempotency Configuration
+
+HTTP-level idempotency is handled by `lib-common-web`'s `IdempotencyWebFilter`. This provides automatic duplicate request detection using the `X-Idempotency-Key` header.
+
+### Configuration
+
+```yaml
+idempotency:
+  header-name: X-Idempotency-Key  # Header name (default)
+  cache:
+    ttl-hours: 24  # How long to cache responses (default: 24 hours)
+```
+
+### How It Works
+
+1. **Client sends request with X-Idempotency-Key header**:
+   ```bash
+   curl -X POST http://localhost:8080/api/v1/webhook/stripe \
+     -H "Content-Type: application/json" \
+     -H "X-Idempotency-Key: unique-request-id-123" \
+     -d '{"type": "payment_intent.succeeded"}'
+   ```
+
+2. **IdempotencyWebFilter intercepts the request**:
+   - Checks cache for the idempotency key
+   - If found: returns cached HTTP response (status, headers, body)
+   - If not found: proceeds with request processing and caches the complete response
+
+3. **Subsequent requests with same key**:
+   - Return cached response immediately
+   - No controller or business logic execution
+   - Exact same HTTP response (202 ACCEPTED with same eventId, timestamps, etc.)
+
+### Key Prefixes
+
+The HTTP idempotency cache uses the prefix `:idempotency:` which, combined with the cache's own prefix, results in keys like:
+```
+firefly:webhooks::idempotency:{your-key}
+```
+
+### Disabling Idempotency for Specific Endpoints
+
+Use the `@DisableIdempotency` annotation:
+```java
+@PostMapping("/api/v1/webhook/special")
+@DisableIdempotency
+public Mono<ResponseEntity> specialEndpoint() {
+    // This endpoint will not have idempotency checking
+}
+```
+
+### Environment Variables
+
+```bash
+# Configure idempotency header name
+IDEMPOTENCY_HEADER_NAME=X-Idempotency-Key
+
+# Configure cache TTL (in hours)
+IDEMPOTENCY_CACHE_TTL_HOURS=24
+```
+
+### Difference from Event-Level Idempotency
+
+The platform has **two levels** of idempotency:
+
+1. **HTTP-level (lib-common-web)**: Prevents duplicate HTTP requests
+   - Scope: Request/Response
+   - Key: `X-Idempotency-Key` header
+   - Cache prefix: `:idempotency:`
+
+2. **Event-level (CacheBasedWebhookIdempotencyService)**: Prevents duplicate event processing by workers
+   - Scope: Kafka consumer / Worker processing
+   - Key: `eventId` (UUID)
+   - Cache prefixes: `webhook:processing:`, `webhook:processed:`, `webhook:failures:`
+
+Both levels are independent and serve different purposes.
 
 ## Event-Driven Architecture Configuration
 
@@ -630,12 +709,20 @@ firefly:
 
 ### 3. Configure Appropriate TTLs
 
-**Idempotency Keys**:
+**Event Idempotency (Worker-level)**:
 ```yaml
 firefly:
   cache:
     redis:
       default-ttl: 7d  # Keep for 7 days (webhook providers may retry)
+```
+
+**HTTP Idempotency (Request-level)**:
+```yaml
+idempotency:
+  header-name: X-Idempotency-Key
+  cache:
+    ttl-hours: 24  # Keep HTTP responses cached for 24 hours
 ```
 
 ### 4. Use Topic Prefixes for Multi-Tenancy

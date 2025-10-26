@@ -280,8 +280,8 @@ com.firefly.common.webhooks.core/
 │   └── TracingWebFilter       # Distributed tracing
 ├── health/                    # Health indicators
 │   └── WebhookCircuitBreakerHealthIndicator
-├── idempotency/              # Idempotency services
-│   └── HttpIdempotencyService # HTTP-level idempotency
+├── idempotency/              # (Removed - now using lib-common-web)
+│   # HTTP-level idempotency moved to lib-common-web IdempotencyWebFilter
 ├── mappers/                   # MapStruct mappers
 │   └── WebhookEventMapper     # DTO ↔ Event mapping
 ├── metrics/                   # Metrics services
@@ -301,7 +301,8 @@ com.firefly.common.webhooks.core/
 - **Resilience Patterns**: Circuit breaker, rate limiter, timeout, bulkhead
 - **Security**: Payload validation, rate limiting, IP whitelisting
 - **Observability**: Custom metrics, distributed tracing, health indicators
-- **Idempotency**: HTTP-level idempotency with Redis caching
+- **HTTP Idempotency**: Handled by lib-common-web IdempotencyWebFilter (transparent)
+- **Event Idempotency**: Worker-level via CacheBasedWebhookIdempotencyService (processor module)
 
 **Dependencies**:
 - `lib-common-eda` - Event publishing
