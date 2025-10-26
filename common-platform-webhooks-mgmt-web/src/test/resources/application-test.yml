@@ -48,8 +48,6 @@ firefly:
       provider-name-pattern: "^[a-z0-9-]+$"
       enable-ip-whitelist: false
       ip-whitelist: {}  # Empty map for tests
-      enable-http-idempotency: true
-      http-idempotency-ttl-seconds: 86400
       enable-request-validation: true
       allowed-methods:
         - POST
@@ -75,17 +73,17 @@ firefly:
     metadata-enrichment:
       enabled: true
 
-  # Cache Configuration for Idempotency
+  # Cache Configuration
   cache:
     enabled: true
     default-cache-type: REDIS
     caffeine:
       enabled: true
-      cache-name: "webhook-idempotency-fallback"
+      cache-name: "default"
       default-ttl: 7d
       max-size: 10000
     redis:
-      cache-name: "webhook-idempotency"
+      cache-name: "default"
       enabled: true
       # These will be overridden by test containers via @DynamicPropertySource
       host: localhost
@@ -96,6 +94,12 @@ firefly:
       connection-timeout: 10s
       command-timeout: 5s
       ssl: false
+
+# HTTP-level idempotency configuration (lib-common-web)
+idempotency:
+  header-name: X-Idempotency-Key
+  cache:
+    ttl-hours: 24
 
   # EDA Configuration - Kafka bootstrap servers overridden by Testcontainers
   eda:

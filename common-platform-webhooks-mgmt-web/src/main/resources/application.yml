@@ -97,6 +97,9 @@ management:
 
 # Firefly Webhook Configuration
 firefly:
+  cqrs:
+    enabled: false
+
   webhooks:
     # Destination Configuration for Message Queue Topics/Queues
     # The destination is built using: {prefix}{provider-name}{suffix}
