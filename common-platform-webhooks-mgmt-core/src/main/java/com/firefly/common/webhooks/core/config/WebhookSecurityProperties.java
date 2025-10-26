@@ -41,8 +41,6 @@ import java.util.Map;
  * FIREFLY_WEBHOOKS_SECURITY_VALIDATE_PROVIDER_NAME=true
  * FIREFLY_WEBHOOKS_SECURITY_PROVIDER_NAME_PATTERN=^[a-z0-9-]+$
  * FIREFLY_WEBHOOKS_SECURITY_ENABLE_IP_WHITELIST=false
- * FIREFLY_WEBHOOKS_SECURITY_ENABLE_HTTP_IDEMPOTENCY=true
- * FIREFLY_WEBHOOKS_SECURITY_HTTP_IDEMPOTENCY_TTL_SECONDS=86400
  * FIREFLY_WEBHOOKS_SECURITY_ENABLE_REQUEST_VALIDATION=true
  * FIREFLY_WEBHOOKS_SECURITY_REQUIRE_CONTENT_TYPE=true
  * </pre>
@@ -89,14 +87,15 @@ public class WebhookSecurityProperties {
     private Map<String, List<String>> ipWhitelist = new HashMap<>();
 
     /**
-     * Enable HTTP-level idempotency using X-Idempotency-Key header
+     * Note: HTTP-level idempotency (X-Idempotency-Key header) is now handled by
+     * lib-common-web's IdempotencyWebFilter. Configure it using:
+     * <pre>
+     * idempotency:
+     *   header-name: X-Idempotency-Key
+     *   cache:
+     *     ttl-hours: 24
+     * </pre>
      */
-    private boolean enableHttpIdempotency = true;
-
-    /**
-     * HTTP idempotency cache TTL in seconds (default: 24 hours)
-     */
-    private long httpIdempotencyTtlSeconds = 86400; // 24 hours
 
     /**
      * Enable request validation
