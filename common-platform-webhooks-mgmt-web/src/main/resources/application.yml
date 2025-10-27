@@ -275,7 +275,10 @@ firefly:
   eda:
     enabled: true
     default-publisher-type: ${FIREFLY_EDA_PUBLISHER_TYPE:KAFKA}
-    default-consumer-type: ${FIREFLY_EDA_CONSUMER_TYPE:KAFKA}
+    # Consumer is disabled - this is a webhook ingestion platform that only publishes events
+    # Webhook workers/processors in separate microservices consume these events
+    consumer:
+      enabled: false
     default-serialization-format: ${FIREFLY_EDA_SERIALIZATION_FORMAT:json}
     metrics-enabled: ${FIREFLY_EDA_METRICS_ENABLED:true} # Enabled for tests
     health-enabled: ${FIREFLY_EDA_HEALTH_ENABLED:true}
