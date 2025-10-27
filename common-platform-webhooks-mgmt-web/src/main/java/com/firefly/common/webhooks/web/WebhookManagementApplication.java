@@ -37,7 +37,8 @@ import org.springframework.web.reactive.config.EnableWebFlux;
 @ConfigurationPropertiesScan
 @ComponentScan(basePackages = {
         "com.firefly.common.webhooks.web",
-        "com.firefly.common.webhooks.core"
+        "com.firefly.common.webhooks.core",
+        "com.firefly.common.web"
 })
 @OpenAPIDefinition(
         info = @Info(
