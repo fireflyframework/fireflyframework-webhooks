@@ -17,16 +17,13 @@
 package com.firefly.common.webhooks.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.firefly.common.cache.manager.FireflyCacheManager;
 import com.firefly.common.webhooks.integration.support.StripeSignatureValidator;
 import com.firefly.common.webhooks.integration.support.TestStripeWebhookListener;
 import com.firefly.common.webhooks.integration.support.TestStripeWebhookProcessor;
-import com.firefly.common.webhooks.processor.idempotency.CacheBasedWebhookIdempotencyService;
 import com.firefly.common.webhooks.processor.port.WebhookIdempotencyService;
 import com.firefly.common.webhooks.processor.port.WebhookSignatureValidator;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
 
 /**
  * Test configuration for webhook integration tests.
@@ -35,7 +32,9 @@ import org.springframework.context.annotation.Primary;
  * - Test webhook processor that tracks processed events
  * - Test webhook listener that consumes from Kafka
  * - Stripe signature validator for testing
- * - Cache-based idempotency service
+ * <p>
+ * Note: WebhookIdempotencyService is auto-configured by WebhookIdempotencyAutoConfiguration
+ * and doesn't need to be created here.
  */
 @TestConfiguration
 public class WebhookIntegrationTestConfiguration {
@@ -52,11 +51,11 @@ public class WebhookIntegrationTestConfiguration {
         return new StripeSignatureValidator(STRIPE_SECRET);
     }
 
-    @Bean
-    public WebhookIdempotencyService webhookIdempotencyService(FireflyCacheManager cacheManager) {
-        return new CacheBasedWebhookIdempotencyService(cacheManager);
-    }
-
+    /**
+     * Test webhook listener that uses auto-configured WebhookIdempotencyService.
+     * The idempotency service is automatically created by WebhookIdempotencyAutoConfiguration
+     * with its own dedicated cache manager.
+     */
     @Bean
     public TestStripeWebhookListener testStripeWebhookListener(
             TestStripeWebhookProcessor processor,
