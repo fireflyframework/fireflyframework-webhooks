@@ -73,8 +73,6 @@ public class CacheBasedWebhookIdempotencyService implements WebhookIdempotencySe
      */
     public CacheBasedWebhookIdempotencyService(FireflyCacheManager cacheManager) {
         this.cacheManager = cacheManager;
-        log.info("Initialized CacheBasedWebhookIdempotencyService with cache: {} ({})",
-                cacheManager.getCacheName(), cacheManager.getCacheType());
     }
 
     @Override

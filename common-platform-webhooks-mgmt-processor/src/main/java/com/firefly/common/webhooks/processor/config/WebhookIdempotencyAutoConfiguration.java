@@ -68,9 +68,7 @@ public class WebhookIdempotencyAutoConfiguration {
     private static final String WEBHOOK_CACHE_KEY_PREFIX = "firefly:webhooks:idempotency";
     private static final Duration WEBHOOK_CACHE_TTL = Duration.ofDays(7);
 
-    public WebhookIdempotencyAutoConfiguration() {
-        log.info("WebhookIdempotencyAutoConfiguration loaded");
-    }
+    // No-arg constructor
 
     /**
      * Creates a dedicated cache manager for webhook event idempotency.
@@ -92,20 +90,13 @@ public class WebhookIdempotencyAutoConfiguration {
     @ConditionalOnBean(CacheManagerFactory.class)
     @ConditionalOnMissingBean(name = "webhookIdempotencyCacheManager")
     public FireflyCacheManager webhookIdempotencyCacheManager(CacheManagerFactory factory) {
-        // Create dedicated cache with descriptive information
-        String description = String.format(
-                "Webhook Event Idempotency Cache - Ensures webhook events are processed exactly once (TTL: %d days)",
-                WEBHOOK_CACHE_TTL.toDays()
-        );
-        
-        // Prefer Redis for distributed webhook workers, but fallback to Caffeine if not available
         return factory.createCacheManager(
                 "webhook-idempotency",
-                CacheType.REDIS,
+                CacheType.AUTO,
                 WEBHOOK_CACHE_KEY_PREFIX,
                 WEBHOOK_CACHE_TTL,
-                description,
-                "webhooks-processor.WebhookIdempotencyAutoConfiguration"
+                "Webhook idempotency cache",
+                "webhooks"
         );
     }
 
@@ -123,11 +114,6 @@ public class WebhookIdempotencyAutoConfiguration {
     @ConditionalOnMissingBean(WebhookIdempotencyService.class)
     public WebhookIdempotencyService webhookIdempotencyService(
             @Qualifier("webhookIdempotencyCacheManager") FireflyCacheManager cacheManager) {
-
-        log.info("Creating webhook idempotency service");
-        log.info("   • Cache type: {}", cacheManager.getCacheType());
-        log.info("   • Cache name: {}", cacheManager.getCacheName());
-
         return new CacheBasedWebhookIdempotencyService(cacheManager);
     }
 }
