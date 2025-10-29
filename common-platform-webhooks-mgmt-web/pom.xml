@@ -110,13 +110,14 @@
             <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
         </dependency>
 
-        <!-- Testing -->
+        <!-- Webhook Processor (for idempotency and event processing) -->
         <dependency>
             <groupId>com.firefly</groupId>
             <artifactId>common-platform-webhooks-mgmt-processor</artifactId>
             <version>${project.version}</version>
-            <scope>test</scope>
         </dependency>
+
+        <!-- Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
