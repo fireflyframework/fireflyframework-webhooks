@@ -87,7 +87,6 @@ public class WebhookIdempotencyAutoConfiguration {
      * @return a dedicated cache manager for webhook idempotency
      */
     @Bean("webhookIdempotencyCacheManager")
-    @ConditionalOnBean(CacheManagerFactory.class)
     @ConditionalOnMissingBean(name = "webhookIdempotencyCacheManager")
     public FireflyCacheManager webhookIdempotencyCacheManager(CacheManagerFactory factory) {
         return factory.createCacheManager(
