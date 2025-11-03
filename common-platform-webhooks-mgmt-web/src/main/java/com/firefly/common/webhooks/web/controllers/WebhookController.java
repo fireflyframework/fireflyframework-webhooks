@@ -326,7 +326,7 @@ public class WebhookController {
             userAgentMap.put("osVersion", metadata.getUserAgent().getOsVersion());
             userAgentMap.put("device", metadata.getUserAgent().getDevice());
             userAgentMap.put("deviceType", metadata.getUserAgent().getDeviceType());
-            userAgentMap.put("isBot", metadata.getUserAgent().isBot());
+            userAgentMap.put("bot", metadata.getUserAgent().isBot());
             map.put("userAgent", userAgentMap);
         }
 

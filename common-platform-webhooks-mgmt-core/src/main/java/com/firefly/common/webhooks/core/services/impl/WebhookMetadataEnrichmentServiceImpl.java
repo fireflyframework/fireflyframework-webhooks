@@ -76,7 +76,7 @@ public class WebhookMetadataEnrichmentServiceImpl implements WebhookMetadataEnri
                     .os("Unknown")
                     .device("Unknown")
                     .deviceType("Unknown")
-                    .isBot(false)
+                    .bot(false)
                     .build();
         }
 
@@ -113,7 +113,7 @@ public class WebhookMetadataEnrichmentServiceImpl implements WebhookMetadataEnri
                 .osVersion(osVersion)
                 .device("Unknown") // Would need more sophisticated parsing
                 .deviceType(deviceType)
-                .isBot(isBot)
+                .bot(isBot)
                 .build();
     }
 
