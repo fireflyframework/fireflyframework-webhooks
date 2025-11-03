@@ -16,6 +16,8 @@
 
 package com.firefly.common.webhooks.core.domain.events;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.firefly.common.webhooks.core.domain.WebhookMetadata;
 import lombok.AllArgsConstructor;
@@ -37,6 +39,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class WebhookReceivedEvent {
 
     /**
@@ -98,6 +101,7 @@ public class WebhookReceivedEvent {
     /**
      * Event type identifier for messaging
      */
+    @JsonIgnore
     public String getEventType() {
         return "webhook." + providerName + ".received";
     }

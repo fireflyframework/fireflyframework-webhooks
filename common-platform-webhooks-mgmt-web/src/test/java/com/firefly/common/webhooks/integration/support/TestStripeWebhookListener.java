@@ -65,14 +65,14 @@ public class TestStripeWebhookListener extends AbstractWebhookEventListener {
 
         // Extract the WebhookReceivedEvent from the envelope
         Object payload = envelope.payload();
-        
+
         if (!(payload instanceof WebhookReceivedEvent)) {
             log.error("Unexpected payload type: {}", payload.getClass().getName());
             return Mono.error(new IllegalArgumentException("Expected WebhookReceivedEvent but got: " + payload.getClass().getName()));
         }
 
         WebhookReceivedEvent event = (WebhookReceivedEvent) payload;
-        
+
         // Delegate to the abstract handler which performs:
         // 1. Idempotency check
         // 2. Signature validation

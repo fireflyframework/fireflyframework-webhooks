@@ -17,11 +17,17 @@
 package com.firefly.common.webhooks.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.firefly.common.eda.consumer.kafka.KafkaEventConsumer;
+import com.firefly.common.eda.listener.EventListenerProcessor;
 import com.firefly.common.webhooks.integration.support.StripeSignatureValidator;
 import com.firefly.common.webhooks.integration.support.TestStripeWebhookListener;
 import com.firefly.common.webhooks.integration.support.TestStripeWebhookProcessor;
 import com.firefly.common.webhooks.processor.port.WebhookIdempotencyService;
 import com.firefly.common.webhooks.processor.port.WebhookSignatureValidator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 
@@ -35,11 +41,52 @@ import org.springframework.context.annotation.Bean;
  * <p>
  * Note: WebhookIdempotencyService is auto-configured by WebhookIdempotencyAutoConfiguration
  * and doesn't need to be created here.
+ * <p>
+ * IMPORTANT: This configuration uses a BeanPostProcessor to manually initialize the
+ * EventListenerProcessor after all beans are created but before KafkaEventConsumer
+ * subscribes to topics. This ensures @EventListener annotations are discovered.
  */
 @TestConfiguration
 public class WebhookIntegrationTestConfiguration {
 
+    private static final Logger log = LoggerFactory.getLogger(WebhookIntegrationTestConfiguration.class);
     private static final String STRIPE_SECRET = "whsec_test_secret_key_12345";
+
+    /**
+     * BeanPostProcessor that initializes EventListenerProcessor after TestStripeWebhookListener
+     * is created but before KafkaEventConsumer starts consuming.
+     */
+    @Bean
+    public static BeanPostProcessor eventListenerInitializer() {
+        return new BeanPostProcessor() {
+            private boolean initialized = false;
+
+            @Override
+            public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+                // After TestStripeWebhookListener is created, initialize EventListenerProcessor
+                if (!initialized && bean instanceof TestStripeWebhookListener) {
+                    log.info("🔧 TestStripeWebhookListener bean created, now initializing EventListenerProcessor");
+                    initialized = true;
+                }
+
+                // When EventListenerProcessor is created, manually initialize it
+                if (bean instanceof EventListenerProcessor processor) {
+                    log.info("🔧 Manually initializing EventListenerProcessor for test configuration");
+                    processor.initializeEventListeners();
+                    log.info("✅ EventListenerProcessor initialized with {} topics",
+                            processor.getTopicsForConsumerType("KAFKA").size());
+                }
+
+                // After EventListenerProcessor is initialized, refresh KafkaEventConsumer topics
+                if (initialized && bean instanceof KafkaEventConsumer consumer) {
+                    log.info("🔄 Refreshing KafkaEventConsumer topics after EventListenerProcessor initialization");
+                    consumer.refreshTopics();
+                }
+
+                return bean;
+            }
+        };
+    }
 
     @Bean
     public TestStripeWebhookProcessor testStripeWebhookProcessor() {
