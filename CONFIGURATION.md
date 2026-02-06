@@ -15,7 +15,7 @@
 
 ## Overview
 
-The Firefly Webhook Management Platform is configured using a combination of:
+The Firefly Framework Webhooks Library is configured using a combination of:
 1. **Environment Variables** - For deployment-specific values (Kafka URLs, Redis hosts, etc.)
 2. **application.yml** - For application-level configuration
 3. **Firefly Libraries** - Configuration from `lib-common-eda`, `lib-common-cache`, etc.
@@ -89,7 +89,7 @@ These environment variables **must** be set for the application to start:
 ```yaml
 spring:
   application:
-    name: common-platform-webhooks-mgmt
+    name: fireflyframework-webhooks
 ```
 
 #### Bean Definition Overriding
@@ -528,7 +528,7 @@ springdoc:
     tags-sorter: alpha
     operations-sorter: alpha
   show-actuator: true
-  packages-to-scan: com.firefly.common.webhooks.web.controllers
+  packages-to-scan: org.fireflyframework.webhooks.web.controllers
   paths-to-match: /api/**
 ```
 
@@ -560,18 +560,18 @@ firefly:
 logging:
   level:
     root: INFO
-    com.firefly.common.webhooks: DEBUG
-    com.firefly.common.eda: DEBUG
-    com.firefly.common.eventsourcing: DEBUG
+    org.fireflyframework.webhooks: DEBUG
+    org.fireflyframework.common.eda: DEBUG
+    org.fireflyframework.common.eventsourcing: DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
 ```
 
 **Log Levels**:
 - `root: INFO` - Default log level for all packages
-- `com.firefly.common.webhooks: DEBUG` - Debug level for webhook platform
-- `com.firefly.common.eda: DEBUG` - Debug level for EDA library
-- `com.firefly.common.eventsourcing: DEBUG` - Debug level for event sourcing
+- `org.fireflyframework.webhooks: DEBUG` - Debug level for webhook platform
+- `org.fireflyframework.common.eda: DEBUG` - Debug level for EDA library
+- `org.fireflyframework.common.eventsourcing: DEBUG` - Debug level for event sourcing
 
 ## Configuration Examples
 
@@ -786,7 +786,7 @@ firefly:
 **Solution**: Ensure dependency is in compile/runtime scope:
 ```xml
 <dependency>
-    <groupId>com.firefly.common</groupId>
+    <groupId>org.fireflyframework.common</groupId>
     <artifactId>lib-common-cache</artifactId>
     <version>${lib-common-cache.version}</version>
     <!-- NOT test scope -->

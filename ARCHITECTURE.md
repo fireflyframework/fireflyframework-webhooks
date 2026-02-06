@@ -14,7 +14,7 @@
 
 ## Overview
 
-The Firefly Webhook Management Platform is built using a **microservices-oriented architecture** with clear separation between webhook ingestion (producer) and webhook processing (consumer). The platform follows **reactive programming principles** using Spring WebFlux and Project Reactor for non-blocking, high-throughput operations.
+The Firefly Framework Webhooks Library is built using a **microservices-oriented architecture** with clear separation between webhook ingestion (producer) and webhook processing (consumer). The platform follows **reactive programming principles** using Spring WebFlux and Project Reactor for non-blocking, high-throughput operations.
 
 ### Core Architectural Principles
 
@@ -270,7 +270,7 @@ The platform separates write operations (commands) from read operations (queries
 
 **Package Structure**:
 ```
-com.firefly.common.webhooks.core/
+org.fireflyframework.webhooks.core/
 ├── config/                    # Configuration classes
 │   ├── ResilienceConfig       # Resilience4j configuration
 │   └── WebhookSecurityProperties  # Security properties
@@ -331,7 +331,7 @@ com.firefly.common.webhooks.core/
 **Note**: All business logic, services, configuration, and infrastructure code has been moved to the `-core` module. This module contains only the application entry point and REST controllers.
 
 **Dependencies**:
-- `common-platform-webhooks-mgmt-core` - Core business logic
+- `fireflyframework-webhooks-core` - Core business logic
 - Spring Boot WebFlux
 - Spring Boot Actuator
 - SpringDoc OpenAPI
@@ -1129,5 +1129,5 @@ public Mono<WebhookProcessingResult> processWithIdempotency(WebhookProcessingCon
 
 ## Conclusion
 
-The Firefly Webhook Management Platform is designed for **high throughput**, **scalability**, and **reliability**. The architecture follows industry best practices including reactive programming, event-driven architecture, hexagonal architecture, and idempotency. The platform can handle millions of webhooks per day while maintaining low latency and high availability.
+The Firefly Framework Webhooks Library is designed for **high throughput**, **scalability**, and **reliability**. The architecture follows industry best practices including reactive programming, event-driven architecture, hexagonal architecture, and idempotency. The platform can handle millions of webhooks per day while maintaining low latency and high availability.
 ```

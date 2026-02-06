@@ -1,4 +1,4 @@
-# Firefly Webhook Management Platform
+# Firefly Framework Webhooks Library
 
 [![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.org/projects/jdk/21/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.2-brightgreen.svg)](https://spring.io/projects/spring-boot)
@@ -24,7 +24,7 @@ A production-ready, scalable webhook ingestion platform that receives webhooks f
 
 ## 🎯 Overview
 
-The Firefly Webhook Management Platform is a **universal webhook ingestion service** that:
+The Firefly Framework Webhooks Library is a **universal webhook ingestion service** that:
 
 1. **Receives** webhooks from any provider via a single dynamic HTTP endpoint
 2. **Publishes** webhook events to Kafka/RabbitMQ for asynchronous processing
@@ -178,8 +178,8 @@ This platform follows a **producer-consumer pattern** where:
 ### 1. Build the Project
 
 ```bash
-git clone https://github.com/firefly-oss/common-platform-webhooks-mgmt.git
-cd common-platform-webhooks-mgmt
+git clone https://github.com/firefly-oss/fireflyframework-webhooks.git
+cd fireflyframework-webhooks
 mvn clean install
 ```
 
@@ -196,7 +196,7 @@ export REDIS_SSL=false
 ### 3. Run the Application
 
 ```bash
-cd common-platform-webhooks-mgmt-web
+cd fireflyframework-webhooks-web
 mvn spring-boot:run
 ```
 
@@ -222,17 +222,17 @@ curl -X POST http://localhost:8080/api/v1/webhook/stripe \
 The project follows a **multi-module Maven structure** with clear separation of concerns:
 
 ```
-common-platform-webhooks-mgmt/
-├── common-platform-webhooks-mgmt-interfaces/    # DTOs and API contracts
-├── common-platform-webhooks-mgmt-core/          # Business logic, services, and configuration
-├── common-platform-webhooks-mgmt-processor/     # Worker framework (ports & adapters)
-├── common-platform-webhooks-mgmt-web/           # Main application and REST controllers only
-└── common-platform-webhooks-mgmt-sdk/           # Java SDK (auto-generated from OpenAPI)
+fireflyframework-webhooks/
+├── fireflyframework-webhooks-interfaces/    # DTOs and API contracts
+├── fireflyframework-webhooks-core/          # Business logic, services, and configuration
+├── fireflyframework-webhooks-processor/     # Worker framework (ports & adapters)
+├── fireflyframework-webhooks-web/           # Main application and REST controllers only
+└── fireflyframework-webhooks-sdk/           # Java SDK (auto-generated from OpenAPI)
 ```
 
 ### Module Details
 
-#### 1. `common-platform-webhooks-mgmt-interfaces`
+#### 1. `fireflyframework-webhooks-interfaces`
 **Purpose**: Shared DTOs and contracts used across all modules
 
 **Key Components**:
@@ -241,12 +241,12 @@ common-platform-webhooks-mgmt/
 
 **Dependencies**: None (pure POJOs with Jackson annotations)
 
-#### 2. `common-platform-webhooks-mgmt-core`
+#### 2. `fireflyframework-webhooks-core`
 **Purpose**: Core business logic, services, configuration, and infrastructure
 
 **Package Structure**:
 ```
-com.firefly.common.webhooks.core/
+org.fireflyframework.webhooks.core/
 ├── config/                    # Configuration classes
 │   ├── ResilienceConfig.java           # Resilience4j configuration (circuit breaker, rate limiter, timeout)
 │   └── WebhookSecurityProperties.java  # Security configuration properties (env var support)
@@ -289,7 +289,7 @@ com.firefly.common.webhooks.core/
 - Micrometer - Metrics
 - MapStruct - Mapping
 
-#### 3. `common-platform-webhooks-mgmt-processor`
+#### 3. `fireflyframework-webhooks-processor`
 **Purpose**: Hexagonal architecture framework for building webhook workers
 
 **Key Components**:
@@ -311,7 +311,7 @@ com.firefly.common.webhooks.core/
 - `lib-common-cache` - Redis/Caffeine caching
 - Spring Kafka
 
-#### 4. `common-platform-webhooks-mgmt-web`
+#### 4. `fireflyframework-webhooks-web`
 **Purpose**: Main Spring Boot application and REST controllers **ONLY**
 
 **Key Components**:
@@ -323,12 +323,12 @@ com.firefly.common.webhooks.core/
 **Note**: All business logic, services, configuration, and infrastructure code has been moved to the `-core` module. This module contains only the application entry point and REST controllers.
 
 **Dependencies**:
-- `common-platform-webhooks-mgmt-core` - Core business logic
+- `fireflyframework-webhooks-core` - Core business logic
 - Spring Boot WebFlux
 - Spring Boot Actuator
 - SpringDoc OpenAPI
 
-#### 5. `common-platform-webhooks-mgmt-sdk`
+#### 5. `fireflyframework-webhooks-sdk`
 **Purpose**: Auto-generated Java SDK for webhook platform API
 
 **Key Components**:
@@ -1292,7 +1292,7 @@ The platform also sets Kafka message headers:
 mvn test
 
 # Run tests for specific module
-cd common-platform-webhooks-mgmt-web
+cd fireflyframework-webhooks-web
 mvn test
 
 # Run integration tests only
@@ -1321,7 +1321,7 @@ Tests automatically start Docker containers for:
 ### Code Structure
 
 ```
-common-platform-webhooks-mgmt-web/
+fireflyframework-webhooks-web/
 ├── src/main/java/
 │   └── com/firefly/common/webhooks/
 │       ├── web/
@@ -1344,7 +1344,7 @@ common-platform-webhooks-mgmt-web/
 
 ### Building a Worker Application
 
-See the [Processor Framework README](common-platform-webhooks-mgmt-processor/README.md) for detailed instructions on building webhook workers.
+See the [Processor Framework README](fireflyframework-webhooks-processor/README.md) for detailed instructions on building webhook workers.
 
 Quick example:
 
@@ -1579,7 +1579,7 @@ The application uses structured JSON logging with correlation IDs:
 {
   "timestamp": "2025-10-22T10:00:00.123Z",
   "level": "INFO",
-  "logger": "com.firefly.common.webhooks.web.controllers.WebhookController",
+  "logger": "org.fireflyframework.webhooks.web.controllers.WebhookController",
   "message": "Webhook received",
   "eventId": "evt-456",
   "providerName": "stripe",
@@ -1677,6 +1677,6 @@ For questions or issues:
 
 ## 🔗 Related Documentation
 
-- [Processor Framework Guide](common-platform-webhooks-mgmt-processor/README.md) - How to build webhook workers
+- [Processor Framework Guide](fireflyframework-webhooks-processor/README.md) - How to build webhook workers
 - [Configuration Guide](CONFIGURATION_GUIDE.md) - Complete configuration reference for all features
 

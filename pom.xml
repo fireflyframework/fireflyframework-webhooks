@@ -5,58 +5,54 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.firefly</groupId>
-        <artifactId>lib-parent-pom</artifactId>
+        <groupId>org.fireflyframework</groupId>
+        <artifactId>fireflyframework-parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
+        <relativePath/>
     </parent>
 
-    <artifactId>common-platform-webhooks-mgmt</artifactId>
+    <groupId>org.fireflyframework</groupId>
+    <artifactId>fireflyframework-webhooks</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
-    
-    <name>Firefly Webhook Management Platform</name>
-    <description>Unified webhook ingestion platform for multiple providers with event sourcing and message queue integration</description>
-    
-    <modules>
-        <module>common-platform-webhooks-mgmt-interfaces</module>
-        <module>common-platform-webhooks-mgmt-core</module>
-        <module>common-platform-webhooks-mgmt-web</module>
-        <module>common-platform-webhooks-mgmt-processor</module>
-        <module>common-platform-webhooks-mgmt-sdk</module>
-    </modules>
 
-    <properties>
-        <common-platform-webhooks-mgmt.version>
-            1.0.0-SNAPSHOT
-        </common-platform-webhooks-mgmt.version>
-    </properties>
+    <name>Firefly Framework - Webhooks Library</name>
+    <description>Reactive webhook ingestion platform with provider-agnostic routing, message queue integration, rate limiting, and comprehensive observability</description>
+
+    <modules>
+        <module>fireflyframework-webhooks-interfaces</module>
+        <module>fireflyframework-webhooks-core</module>
+        <module>fireflyframework-webhooks-web</module>
+        <module>fireflyframework-webhooks-processor</module>
+        <module>fireflyframework-webhooks-sdk</module>
+    </modules>
 
     <dependencyManagement>
         <dependencies>
             <!-- Internal modules -->
             <dependency>
-                <groupId>com.firefly</groupId>
-                <artifactId>common-platform-webhooks-mgmt-interfaces</artifactId>
+                <groupId>org.fireflyframework</groupId>
+                <artifactId>fireflyframework-webhooks-interfaces</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.firefly</groupId>
-                <artifactId>common-platform-webhooks-mgmt-core</artifactId>
+                <groupId>org.fireflyframework</groupId>
+                <artifactId>fireflyframework-webhooks-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.firefly</groupId>
-                <artifactId>common-platform-webhooks-mgmt-web</artifactId>
+                <groupId>org.fireflyframework</groupId>
+                <artifactId>fireflyframework-webhooks-web</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.firefly</groupId>
-                <artifactId>common-platform-webhooks-mgmt-processor</artifactId>
+                <groupId>org.fireflyframework</groupId>
+                <artifactId>fireflyframework-webhooks-processor</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.firefly</groupId>
-                <artifactId>common-platform-webhooks-mgmt-sdk</artifactId>
+                <groupId>org.fireflyframework</groupId>
+                <artifactId>fireflyframework-webhooks-sdk</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>
