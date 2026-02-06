@@ -74,7 +74,7 @@ public class WebhookController {
     private final WebhookProcessingService webhookProcessingService;
     private final WebhookValidator webhookValidator;
     private final WebhookMetricsService metricsService;
-    private final com.firefly.common.webhooks.core.ratelimit.WebhookRateLimitService rateLimitService;
+    private final org.fireflyframework.webhooks.core.ratelimit.WebhookRateLimitService rateLimitService;
     private final WebhookMetadataEnrichmentService metadataEnrichmentService;
 
     /**

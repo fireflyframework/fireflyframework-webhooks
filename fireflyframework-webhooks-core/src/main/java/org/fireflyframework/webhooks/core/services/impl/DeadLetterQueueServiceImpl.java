@@ -16,8 +16,8 @@
 
 package org.fireflyframework.webhooks.core.services.impl;
 
-import com.firefly.common.eda.publisher.EventPublisher;
-import com.firefly.common.eda.publisher.EventPublisherFactory;
+import org.fireflyframework.eda.publisher.EventPublisher;
+import org.fireflyframework.eda.publisher.EventPublisherFactory;
 import org.fireflyframework.webhooks.core.domain.events.WebhookRejectedEvent;
 import org.fireflyframework.webhooks.core.services.DeadLetterQueueService;
 import lombok.RequiredArgsConstructor;

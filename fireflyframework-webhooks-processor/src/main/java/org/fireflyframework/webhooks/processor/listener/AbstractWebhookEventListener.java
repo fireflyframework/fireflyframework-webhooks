@@ -47,7 +47,7 @@ import java.util.UUID;
  *         super(processor, objectMapper);
  *     }
  *     
- *     @com.firefly.common.eda.annotation.EventListener(
+ *     @org.fireflyframework.eda.annotation.EventListener(
  *         destinations = {"stripe", "stripe-test"},  // Can listen to multiple topics
  *         groupId = "stripe-webhook-processor",
  *         consumerType = PublisherType.KAFKA,
@@ -115,7 +115,7 @@ public abstract class AbstractWebhookEventListener {
      * Example:
      * <pre>
      * {@code
-     * @com.firefly.common.eda.annotation.EventListener(
+     * @org.fireflyframework.eda.annotation.EventListener(
      *     destinations = {"stripe"},
      *     groupId = "stripe-webhook-processor"
      * )
