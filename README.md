@@ -1,6 +1,6 @@
 # Firefly Framework Webhooks Library
 
-[![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.org/projects/jdk/21/)
+[![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/projects/jdk/21/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.2-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
@@ -345,8 +345,8 @@ org.fireflyframework.webhooks.core/
 ## 🛠️ Technology Stack
 
 ### Core Technologies
-- **Java 21** - Latest LTS with virtual threads and pattern matching
-- **Spring Boot 3.2.2** - Application framework
+- **Java 25** - Latest LTS with virtual threads and pattern matching (Java 21+ compatible)
+- **Spring Boot 3.5.9** - Application framework
 - **Spring WebFlux** - Reactive web framework (Netty-based)
 - **Project Reactor** - Reactive programming library
 
