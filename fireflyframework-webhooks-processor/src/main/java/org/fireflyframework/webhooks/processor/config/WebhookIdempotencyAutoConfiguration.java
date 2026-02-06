@@ -16,10 +16,10 @@
 
 package org.fireflyframework.webhooks.processor.config;
 
-import com.firefly.common.cache.config.CacheAutoConfiguration;
-import com.firefly.common.cache.core.CacheType;
-import com.firefly.common.cache.factory.CacheManagerFactory;
-import com.firefly.common.cache.manager.FireflyCacheManager;
+import org.fireflyframework.cache.config.CacheAutoConfiguration;
+import org.fireflyframework.cache.core.CacheType;
+import org.fireflyframework.cache.factory.CacheManagerFactory;
+import org.fireflyframework.cache.manager.FireflyCacheManager;
 import org.fireflyframework.webhooks.processor.idempotency.CacheBasedWebhookIdempotencyService;
 import org.fireflyframework.webhooks.processor.port.WebhookIdempotencyService;
 import lombok.extern.slf4j.Slf4j;

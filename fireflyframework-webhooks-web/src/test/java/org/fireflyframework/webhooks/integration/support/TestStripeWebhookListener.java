@@ -17,9 +17,9 @@
 package org.fireflyframework.webhooks.integration.support;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.firefly.common.eda.annotation.EventListener;
-import com.firefly.common.eda.annotation.PublisherType;
-import com.firefly.common.eda.event.EventEnvelope;
+import org.fireflyframework.eda.annotation.EventListener;
+import org.fireflyframework.eda.annotation.PublisherType;
+import org.fireflyframework.eda.event.EventEnvelope;
 import org.fireflyframework.webhooks.core.domain.events.WebhookReceivedEvent;
 import org.fireflyframework.webhooks.processor.listener.AbstractWebhookEventListener;
 import org.fireflyframework.webhooks.processor.port.WebhookIdempotencyService;

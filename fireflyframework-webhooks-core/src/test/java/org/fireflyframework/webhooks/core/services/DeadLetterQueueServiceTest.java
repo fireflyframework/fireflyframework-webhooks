@@ -18,8 +18,8 @@ package org.fireflyframework.webhooks.core.services;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.firefly.common.eda.publisher.EventPublisher;
-import com.firefly.common.eda.publisher.EventPublisherFactory;
+import org.fireflyframework.eda.publisher.EventPublisher;
+import org.fireflyframework.eda.publisher.EventPublisherFactory;
 import org.fireflyframework.webhooks.core.domain.events.WebhookRejectedEvent;
 import org.fireflyframework.webhooks.core.services.impl.DeadLetterQueueServiceImpl;
 import org.junit.jupiter.api.BeforeEach;

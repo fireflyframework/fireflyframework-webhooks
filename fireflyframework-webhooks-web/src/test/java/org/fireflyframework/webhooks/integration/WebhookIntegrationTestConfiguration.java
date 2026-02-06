@@ -17,8 +17,8 @@
 package org.fireflyframework.webhooks.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.firefly.common.eda.consumer.kafka.KafkaEventConsumer;
-import com.firefly.common.eda.listener.EventListenerProcessor;
+import org.fireflyframework.eda.consumer.kafka.KafkaEventConsumer;
+import org.fireflyframework.eda.listener.EventListenerProcessor;
 import org.fireflyframework.webhooks.integration.support.StripeSignatureValidator;
 import org.fireflyframework.webhooks.integration.support.TestStripeWebhookListener;
 import org.fireflyframework.webhooks.integration.support.TestStripeWebhookProcessor;

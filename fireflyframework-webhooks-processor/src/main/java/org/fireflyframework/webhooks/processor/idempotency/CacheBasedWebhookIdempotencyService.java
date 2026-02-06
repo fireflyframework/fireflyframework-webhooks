@@ -16,7 +16,7 @@
 
 package org.fireflyframework.webhooks.processor.idempotency;
 
-import com.firefly.common.cache.manager.FireflyCacheManager;
+import org.fireflyframework.cache.manager.FireflyCacheManager;
 import org.fireflyframework.webhooks.processor.port.WebhookIdempotencyService;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
