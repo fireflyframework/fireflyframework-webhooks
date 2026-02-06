@@ -43,10 +43,10 @@ public class WebhookEventDTO {
     @Schema(description = "Unique identifier for this webhook event", example = "123e4567-e89b-12d3-a456-426614174000")
     private UUID eventId;
 
-    @Schema(description = "Name of the webhook provider", example = "stripe", required = true)
+    @Schema(description = "Name of the webhook provider", example = "stripe", requiredMode = Schema.RequiredMode.REQUIRED)
     private String providerName;
 
-    @Schema(description = "Raw webhook payload as JSON", required = true)
+    @Schema(description = "Raw webhook payload as JSON", requiredMode = Schema.RequiredMode.REQUIRED)
     private JsonNode payload;
 
     @Schema(description = "HTTP headers from the webhook request")
