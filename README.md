@@ -346,7 +346,7 @@ org.fireflyframework.webhooks.core/
 
 ### Core Technologies
 - **Java 25** - Latest LTS with virtual threads and pattern matching (Java 21+ compatible)
-- **Spring Boot 3.5.9** - Application framework
+- **Spring Boot 3.5.10** - Application framework
 - **Spring WebFlux** - Reactive web framework (Netty-based)
 - **Project Reactor** - Reactive programming library
 

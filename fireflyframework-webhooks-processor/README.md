@@ -468,7 +468,7 @@ This guide shows you how to create webhook processors, validators, and listeners
 ### Prerequisites
 
 - Java 21+
-- Spring Boot 3.5.9+
+- Spring Boot 3.5.10+
 - Access to Kafka (configured via `lib-common-eda`)
 - Access to Redis (configured via `lib-common-cache`)
 - The webhook platform is deployed and publishing events to Kafka
