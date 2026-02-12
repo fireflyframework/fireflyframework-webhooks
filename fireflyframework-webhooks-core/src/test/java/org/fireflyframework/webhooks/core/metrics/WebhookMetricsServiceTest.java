@@ -52,7 +52,7 @@ class WebhookMetricsServiceTest {
 
         metricsService.recordWebhookReceived(providerName);
 
-        Counter counter = meterRegistry.find("webhooks.received")
+        Counter counter = meterRegistry.find("firefly.webhooks.received")
                 .tag("provider", providerName)
                 .counter();
 
@@ -69,7 +69,7 @@ class WebhookMetricsServiceTest {
         metricsService.recordWebhookReceived(providerName);
         metricsService.recordWebhookReceived(providerName);
 
-        Counter counter = meterRegistry.find("webhooks.received")
+        Counter counter = meterRegistry.find("firefly.webhooks.received")
                 .tag("provider", providerName)
                 .counter();
 
@@ -84,11 +84,11 @@ class WebhookMetricsServiceTest {
         metricsService.recordWebhookReceived("stripe");
         metricsService.recordWebhookReceived("github");
 
-        Counter stripeCounter = meterRegistry.find("webhooks.received")
+        Counter stripeCounter = meterRegistry.find("firefly.webhooks.received")
                 .tag("provider", "stripe")
                 .counter();
 
-        Counter githubCounter = meterRegistry.find("webhooks.received")
+        Counter githubCounter = meterRegistry.find("firefly.webhooks.received")
                 .tag("provider", "github")
                 .counter();
 
@@ -110,7 +110,7 @@ class WebhookMetricsServiceTest {
 
         metricsService.recordWebhookPublished(providerName);
 
-        Counter counter = meterRegistry.find("webhooks.published")
+        Counter counter = meterRegistry.find("firefly.webhooks.published")
                 .tag("provider", providerName)
                 .counter();
 
@@ -128,7 +128,7 @@ class WebhookMetricsServiceTest {
         metricsService.recordWebhookPublished(providerName);
         metricsService.recordWebhookPublished(providerName);
 
-        Counter counter = meterRegistry.find("webhooks.published")
+        Counter counter = meterRegistry.find("firefly.webhooks.published")
                 .tag("provider", providerName)
                 .counter();
 
@@ -148,7 +148,7 @@ class WebhookMetricsServiceTest {
 
         metricsService.recordProcessingTime(providerName, startTime);
 
-        Timer timer = meterRegistry.find("webhooks.processing.time")
+        Timer timer = meterRegistry.find("firefly.webhooks.processing.time")
                 .tag("provider", providerName)
                 .timer();
 
@@ -167,7 +167,7 @@ class WebhookMetricsServiceTest {
         metricsService.recordProcessingTime(providerName, Instant.now().minusMillis(200));
         metricsService.recordProcessingTime(providerName, Instant.now().minusMillis(300));
 
-        Timer timer = meterRegistry.find("webhooks.processing.time")
+        Timer timer = meterRegistry.find("firefly.webhooks.processing.time")
                 .tag("provider", providerName)
                 .timer();
 
@@ -184,11 +184,11 @@ class WebhookMetricsServiceTest {
         metricsService.recordProcessingTime("stripe", Instant.now().minusMillis(200));
         metricsService.recordProcessingTime("github", Instant.now().minusMillis(50));
 
-        Timer stripeTimer = meterRegistry.find("webhooks.processing.time")
+        Timer stripeTimer = meterRegistry.find("firefly.webhooks.processing.time")
                 .tag("provider", "stripe")
                 .timer();
 
-        Timer githubTimer = meterRegistry.find("webhooks.processing.time")
+        Timer githubTimer = meterRegistry.find("firefly.webhooks.processing.time")
                 .tag("provider", "github")
                 .timer();
 
@@ -216,15 +216,15 @@ class WebhookMetricsServiceTest {
         metricsService.recordWebhookPublished(providerName);
 
         // Verify all metrics are recorded
-        Counter receivedCounter = meterRegistry.find("webhooks.received")
+        Counter receivedCounter = meterRegistry.find("firefly.webhooks.received")
                 .tag("provider", providerName)
                 .counter();
 
-        Counter publishedCounter = meterRegistry.find("webhooks.published")
+        Counter publishedCounter = meterRegistry.find("firefly.webhooks.published")
                 .tag("provider", providerName)
                 .counter();
 
-        Timer processingTimer = meterRegistry.find("webhooks.processing.time")
+        Timer processingTimer = meterRegistry.find("firefly.webhooks.processing.time")
                 .tag("provider", providerName)
                 .timer();
 
@@ -256,17 +256,17 @@ class WebhookMetricsServiceTest {
         metricsService.recordWebhookPublished("paypal");
 
         // Verify all providers have their own metrics
-        assertThat(meterRegistry.find("webhooks.received").tag("provider", "stripe").counter()).isNotNull();
-        assertThat(meterRegistry.find("webhooks.received").tag("provider", "github").counter()).isNotNull();
-        assertThat(meterRegistry.find("webhooks.received").tag("provider", "paypal").counter()).isNotNull();
+        assertThat(meterRegistry.find("firefly.webhooks.received").tag("provider", "stripe").counter()).isNotNull();
+        assertThat(meterRegistry.find("firefly.webhooks.received").tag("provider", "github").counter()).isNotNull();
+        assertThat(meterRegistry.find("firefly.webhooks.received").tag("provider", "paypal").counter()).isNotNull();
 
-        assertThat(meterRegistry.find("webhooks.published").tag("provider", "stripe").counter()).isNotNull();
-        assertThat(meterRegistry.find("webhooks.published").tag("provider", "github").counter()).isNotNull();
-        assertThat(meterRegistry.find("webhooks.published").tag("provider", "paypal").counter()).isNotNull();
+        assertThat(meterRegistry.find("firefly.webhooks.published").tag("provider", "stripe").counter()).isNotNull();
+        assertThat(meterRegistry.find("firefly.webhooks.published").tag("provider", "github").counter()).isNotNull();
+        assertThat(meterRegistry.find("firefly.webhooks.published").tag("provider", "paypal").counter()).isNotNull();
 
-        assertThat(meterRegistry.find("webhooks.processing.time").tag("provider", "stripe").timer()).isNotNull();
-        assertThat(meterRegistry.find("webhooks.processing.time").tag("provider", "github").timer()).isNotNull();
-        assertThat(meterRegistry.find("webhooks.processing.time").tag("provider", "paypal").timer()).isNotNull();
+        assertThat(meterRegistry.find("firefly.webhooks.processing.time").tag("provider", "stripe").timer()).isNotNull();
+        assertThat(meterRegistry.find("firefly.webhooks.processing.time").tag("provider", "github").timer()).isNotNull();
+        assertThat(meterRegistry.find("firefly.webhooks.processing.time").tag("provider", "paypal").timer()).isNotNull();
     }
 }
 
