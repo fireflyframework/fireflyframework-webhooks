@@ -32,7 +32,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -137,11 +136,7 @@ public class WebhookController {
         Instant startTime = Instant.now();
         UUID eventId = UUID.randomUUID();
 
-        // Set MDC for structured logging
-        MDC.put("eventId", eventId.toString());
-        MDC.put("provider", providerName);
-
-        log.info("Received webhook from provider: {}", providerName);
+        log.info("Received webhook from provider: {} eventId: {}", providerName, eventId);
 
         // Record metrics
         metricsService.recordWebhookReceived(providerName);
@@ -170,10 +165,7 @@ public class WebhookController {
                 )
         )
         .map(response -> ResponseEntity.status(HttpStatus.ACCEPTED).body(response))
-        .doFinally(signal -> {
-            MDC.remove("eventId");
-            MDC.remove("provider");
-        });
+        .contextWrite(ctx -> ctx.put("eventId", eventId.toString()).put("provider", providerName));
     }
 
     /**
