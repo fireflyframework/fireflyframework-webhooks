@@ -43,6 +43,13 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Observability (metrics, tracing, health, structured logging) -->
+        <dependency>
+            <groupId>org.fireflyframework</groupId>
+            <artifactId>fireflyframework-observability</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Spring WebFlux -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
