@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.fireflyframework</groupId>
         <artifactId>fireflyframework-webhooks</artifactId>
-        <version>26.02.02</version>
+        <version>26.02.03</version>
     </parent>
 
     <artifactId>fireflyframework-webhooks-web</artifactId>
