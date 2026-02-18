@@ -6,18 +6,12 @@
     <parent>
         <groupId>org.fireflyframework</groupId>
         <artifactId>fireflyframework-webhooks</artifactId>
-        <version>26.02.04</version>
+        <version>26.02.05</version>
     </parent>
 
     <artifactId>fireflyframework-webhooks-core</artifactId>
     <name>Webhook Management Platform - Core</name>
     <description>Core business logic and domain events for webhook processing</description>
-
-    <properties>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    </properties>
 
     <dependencies>
         <!-- Internal modules -->
@@ -29,7 +23,7 @@
         <!-- Common Libraries -->
         <dependency>
             <groupId>org.fireflyframework</groupId>
-            <artifactId>fireflyframework-core</artifactId>
+            <artifactId>fireflyframework-starter-core</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

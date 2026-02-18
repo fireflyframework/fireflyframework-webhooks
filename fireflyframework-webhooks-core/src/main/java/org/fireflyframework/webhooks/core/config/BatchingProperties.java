@@ -18,6 +18,7 @@ package org.fireflyframework.webhooks.core.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.context.annotation.Configuration;
 
 import java.time.Duration;
@@ -39,6 +40,7 @@ import java.util.Map;
  * </pre>
  */
 @Configuration
+@Validated
 @ConfigurationProperties(prefix = "firefly.webhooks.batching")
 @Data
 public class BatchingProperties {

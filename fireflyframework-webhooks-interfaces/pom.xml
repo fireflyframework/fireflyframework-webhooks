@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.fireflyframework</groupId>
         <artifactId>fireflyframework-webhooks</artifactId>
-        <version>26.02.04</version>
+        <version>26.02.05</version>
     </parent>
 
     <artifactId>fireflyframework-webhooks-interfaces</artifactId>
@@ -14,8 +14,6 @@
     <description>Shared DTOs and contracts for webhook management platform</description>
 
     <properties>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
