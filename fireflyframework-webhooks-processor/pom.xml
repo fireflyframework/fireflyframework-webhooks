@@ -35,6 +35,14 @@
             <artifactId>fireflyframework-eda</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- EDA Kafka adapter: provides the firefly Kafka transport (previously transitive
+             from fireflyframework-eda). The raw spring-kafka dependency below is kept for the
+             direct org.springframework.kafka.support.KafkaHeaders import in TracingContextExtractor. -->
+        <dependency>
+            <groupId>org.fireflyframework</groupId>
+            <artifactId>fireflyframework-eda-kafka</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.fireflyframework</groupId>
             <artifactId>fireflyframework-cache</artifactId>

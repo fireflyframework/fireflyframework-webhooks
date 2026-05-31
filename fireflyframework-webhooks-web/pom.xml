@@ -99,6 +99,21 @@
             <artifactId>fireflyframework-eda</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- EDA Kafka adapter: active publisher (firefly.eda.default-publisher-type=KAFKA).
+             Provides the firefly Kafka transport (org.fireflyframework.eda.*.kafka) and
+             transitively spring-kafka; previously transitive from fireflyframework-eda. -->
+        <dependency>
+            <groupId>org.fireflyframework</groupId>
+            <artifactId>fireflyframework-eda-kafka</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- Cache Redis adapter: active provider (firefly.cache.default-cache-type=REDIS).
+             The Redis cache PROVIDER moved out of fireflyframework-cache(core) into this module. -->
+        <dependency>
+            <groupId>org.fireflyframework</groupId>
+            <artifactId>fireflyframework-cache-redis</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <!-- Redis for distributed caching -->
         <dependency>
